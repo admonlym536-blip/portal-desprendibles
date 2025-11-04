@@ -9,6 +9,7 @@ interface Desprendible {
   id: number
   periodo: string
   tipo_pago: string
+  tipo_documento?: string
   created_at: string
   url_pdf: string
 }
@@ -21,8 +22,9 @@ export default function PortalDesprendibles() {
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
   const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
 
-  // ✅ Bloquear "Atrás" cuando el usuario deba cambiar la clave
   useEffect(() => {
     const handlePopState = () => {
       router.replace('/recuperar-clave')
@@ -31,7 +33,6 @@ export default function PortalDesprendibles() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [router])
 
-  // ✅ Verificar sesión activa
   useEffect(() => {
     const verificarSesion = async () => {
       const { data } = await supabase.auth.getUser()
@@ -60,14 +61,12 @@ export default function PortalDesprendibles() {
     verificarSesion()
   }, [router])
 
-  // ✅ Inicio de sesión
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setMensaje('')
     setCargando(true)
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-
     if (error) {
       setMensaje('❌ Credenciales incorrectas')
       setCargando(false)
@@ -103,8 +102,7 @@ export default function PortalDesprendibles() {
     }, 1000)
   }
 
-  // ✅ Cargar desprendibles
-  const cargarDesprendibles = async (usuario: any) => {
+  const cargarDesprendibles = async (usuario: any, desde?: string, hasta?: string) => {
     try {
       let documento = usuario.user_metadata?.documento
       if (!documento) {
@@ -116,19 +114,25 @@ export default function PortalDesprendibles() {
         documento = empleado?.documento
       }
 
-      const { data } = await supabase
+      let query = supabase
         .from('desprendibles')
         .select('*')
         .eq('documento', documento)
         .order('created_at', { ascending: false })
 
+      if (desde && hasta) {
+        query = query
+          .gte('created_at', `${desde}T00:00:00`)
+          .lte('created_at', `${hasta}T23:59:59`)
+      }
+
+      const { data } = await query
       setDesprendibles(data || [])
     } catch (err) {
       console.error('Error al cargar desprendibles:', err)
     }
   }
 
-  // ✅ Cerrar sesión
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
@@ -140,7 +144,7 @@ export default function PortalDesprendibles() {
   }
 
   // ---------------------------------------------------------------
-  // 🔷 LOGIN VISUAL
+  // LOGIN VISUAL
   // ---------------------------------------------------------------
   if (!user) {
     return (
@@ -272,7 +276,7 @@ export default function PortalDesprendibles() {
   }
 
   // ---------------------------------------------------------------
-  // 🔷 PORTAL DEL EMPLEADO (con bienvenida incluida 👋)
+  // PORTAL DEL EMPLEADO (Hola en lugar de Bienvenido)
   // ---------------------------------------------------------------
   return (
     <div
@@ -306,7 +310,7 @@ export default function PortalDesprendibles() {
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Portal del Empleado</h2>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#DDE6F2' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#DDE6F2' }}>
               {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'} —{' '}
               {user.user_metadata?.id_provision || ''}
             </p>
@@ -329,15 +333,88 @@ export default function PortalDesprendibles() {
         </button>
       </header>
 
-      <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+      {/* 👋 Hola debajo del header */}
+      <div style={{ textAlign: 'center', marginTop: '1.8rem' }}>
         <h3 style={{ color: '#0C3B75', fontWeight: 700, fontSize: '1.3rem' }}>
-          👋 Bienvenido(a), {user.user_metadata?.nombre?.split(' ')[0] || 'Empleado'}!
+          👋 Hola, {user.user_metadata?.nombre?.split(' ')[0] || 'Empleado'}!
         </h3>
         <p style={{ color: '#444', fontSize: '1rem' }}>
-          Aquí puedes descargar tus certificados más recientes.
+          Aquí puedes descargar tus certificados o desprendibles y filtrarlos por rango de fechas.
         </p>
       </div>
 
+      {/* Filtro de fechas */}
+      <div
+        style={{
+          marginTop: '1.2rem',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '1rem',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <label style={{ fontWeight: 600, color: '#0C3B75' }}>Desde:</label>
+        <input
+          type="date"
+          value={fechaDesde}
+          onChange={(e) => setFechaDesde(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '8px',
+            border: '1px solid #ccc',
+            fontSize: '0.95rem',
+          }}
+        />
+        <label style={{ fontWeight: 600, color: '#0C3B75' }}>Hasta:</label>
+        <input
+          type="date"
+          value={fechaHasta}
+          onChange={(e) => setFechaHasta(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '8px',
+            border: '1px solid #ccc',
+            fontSize: '0.95rem',
+          }}
+        />
+        <button
+          onClick={() => cargarDesprendibles(user, fechaDesde, fechaHasta)}
+          style={{
+            background: '#0C3B75',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Buscar
+        </button>
+        {(fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => {
+              setFechaDesde('')
+              setFechaHasta('')
+              cargarDesprendibles(user)
+            }}
+            style={{
+              background: '#999',
+              color: 'white',
+              border: 'none',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Mostrar todos
+          </button>
+        )}
+      </div>
+
+      {/* Tabla */}
       <main
         style={{
           maxWidth: '850px',
@@ -351,6 +428,7 @@ export default function PortalDesprendibles() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
           <thead style={{ background: '#0C3B75', color: 'white' }}>
             <tr>
+              <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Tipo de Documento</th>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Periodo</th>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Tipo de Pago</th>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Fecha</th>
@@ -360,8 +438,8 @@ export default function PortalDesprendibles() {
           <tbody>
             {desprendibles.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#777' }}>
-                  No hay desprendibles disponibles
+                <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: '#777' }}>
+                  No hay documentos disponibles
                 </td>
               </tr>
             ) : (
@@ -375,6 +453,7 @@ export default function PortalDesprendibles() {
                   onMouseOver={(e) => (e.currentTarget.style.background = '#F6FAFF')}
                   onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
                 >
+                  <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_documento || 'Desprendible'}</td>
                   <td style={{ padding: '0.9rem 1.2rem' }}>{d.periodo}</td>
                   <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_pago}</td>
                   <td style={{ padding: '0.9rem 1.2rem' }}>
@@ -405,7 +484,14 @@ export default function PortalDesprendibles() {
         </table>
       </main>
 
-      <footer style={{ textAlign: 'center', padding: '1rem', color: '#777', fontSize: '0.8rem' }}>
+      <footer
+        style={{
+          textAlign: 'center',
+          padding: '1rem',
+          color: '#777',
+          fontSize: '0.8rem',
+        }}
+      >
         © {new Date().getFullYear()} Provisión L&M S.A.S. — Todos los derechos reservados.
       </footer>
     </div>

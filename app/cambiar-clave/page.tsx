@@ -1,77 +1,85 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 
-export default function CambiarClavePage() {
-  const [claveActual, setClaveActual] = useState('')
-  const [nuevaClave, setNuevaClave] = useState('')
-  const [confirmarClave, setConfirmarClave] = useState('')
+export default function RecuperarClave() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [claveCambiada, setClaveCambiada] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ✅ Verificar sesión (si no hay, redirigir)
+  useEffect(() => {
+    const verificarSesion = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) {
+        router.replace('/login')
+        return
+      }
+      setUser(data.user)
+    }
+    verificarSesion()
+  }, [router])
+
+  // ✅ Bloquear botón “Atrás” y cerrar sesión si no cambió la clave
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.href)
+
+    const bloquearAtras = async () => {
+      if (!claveCambiada) {
+        await supabase.auth.signOut()
+        router.replace('/login')
+      }
+    }
+
+    const manejarPop = () => bloquearAtras()
+    window.addEventListener('popstate', manejarPop)
+    return () => window.removeEventListener('popstate', manejarPop)
+  }, [router, claveCambiada])
+
+  // ✅ Cambiar contraseña
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setMensaje('')
     setCargando(true)
 
-    if (!claveActual || !nuevaClave || !confirmarClave) {
-      setMensaje('❌ Debes completar todos los campos.')
+    if (nueva !== confirmar) {
+      setMensaje('⚠️ Las contraseñas no coinciden.')
       setCargando(false)
       return
     }
 
-    if (nuevaClave !== confirmarClave) {
-      setMensaje('❌ Las contraseñas no coinciden.')
+    if (nueva.length < 6) {
+      setMensaje('⚠️ La nueva contraseña debe tener al menos 6 caracteres.')
       setCargando(false)
       return
     }
 
     try {
-      // Obtener sesión activa
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError || !user) {
-        setMensaje('❌ No hay sesión activa.')
-        setCargando(false)
-        return
-      }
+      const { error } = await supabase.auth.updateUser({ password: nueva })
+      if (error) throw error
 
-      // Reautenticar usuario
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: user.email!,
-        password: claveActual,
-      })
-      if (loginError) {
-        setMensaje('❌ La contraseña actual no es válida.')
-        setCargando(false)
-        return
-      }
-
-      // Cambiar contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: nuevaClave,
-      })
-      if (updateError) {
-        setMensaje('❌ Error al actualizar la contraseña.')
-        console.error(updateError.message)
-        setCargando(false)
-        return
-      }
-
-      // Actualizar en la tabla empleados (debe_cambiar_password = false)
-      const { error: updateEmpleadoError } = await supabase
+      await supabase
         .from('empleados')
         .update({ debe_cambiar_password: false })
         .eq('correo', user.email)
 
-      if (updateEmpleadoError) console.error(updateEmpleadoError)
-
-      setMensaje('✅ Contraseña actualizada correctamente. Redirigiendo...')
-      setTimeout(() => {
-        window.location.href = '/login'
-      }, 1500)
-    } catch (error: any) {
-      setMensaje(`❌ Error inesperado: ${error.message}`)
+      setClaveCambiada(true)
+      setMensaje('✅ Tu contraseña fue cambiada correctamente. Serás redirigido al inicio de sesión...')
+      
+      // 🔐 Cerrar sesión y redirigir al login luego de 2.5 s
+      setTimeout(async () => {
+        await supabase.auth.signOut()
+        router.replace('/login')
+      }, 2500)
+    } catch (err) {
+      console.error(err)
+      setMensaje('❌ Error al cambiar la contraseña.')
     } finally {
       setCargando(false)
     }
@@ -79,76 +87,112 @@ export default function CambiarClavePage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center bg-[#0C3B75]"
-      style={{ fontFamily: 'Segoe UI, sans-serif' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #0C3B75 40%, #0A2E5A 100%)',
+        color: 'white',
+        fontFamily: 'Segoe UI, Roboto, sans-serif',
+      }}
     >
-      <div className="bg-white shadow-lg rounded-2xl p-10 w-full max-w-md text-center">
-        <div className="flex justify-center mb-5">
-          <Image
-            src="/Logo_Provision.jpg"
-            alt="Logo Provisión L&M"
-            width={120}
-            height={120}
-            className="rounded-lg object-contain"
-          />
+      <div
+        style={{
+          background: 'white',
+          borderRadius: '20px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          width: '100%',
+          maxWidth: '420px',
+          padding: '2.5rem',
+          textAlign: 'center',
+        }}
+      >
+        {/* Logo */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ width: '120px', height: '120px', position: 'relative' }}>
+            <Image
+              src="/Logo_Provision.jpg"
+              alt="Logo Provisión L&M"
+              fill
+              style={{ objectFit: 'contain', borderRadius: '10px' }}
+              sizes="120px"
+            />
+          </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-[#0C3B75] mb-2">
+        <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: 700 }}>
           Cambiar Contraseña
         </h2>
-        <p className="text-gray-600 text-sm mb-6">
-          Ingresa tu clave actual y define una nueva.
+        <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+          Ingresa y confirma tu nueva contraseña para continuar.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-left">
-          <input
-            type="password"
-            placeholder="Contraseña actual"
-            value={claveActual}
-            onChange={(e) => setClaveActual(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-[#0C3B75] focus:outline-none"
-          />
-
+        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <input
             type="password"
             placeholder="Nueva contraseña"
-            value={nuevaClave}
-            onChange={(e) => setNuevaClave(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-[#0C3B75] focus:outline-none"
+            value={nueva}
+            onChange={(e) => setNueva(e.target.value)}
+            required
+            style={{
+              padding: '0.8rem 1rem',
+              borderRadius: '10px',
+              border: '1px solid #ccc',
+              fontSize: '0.95rem',
+            }}
           />
 
           <input
             type="password"
             placeholder="Confirmar nueva contraseña"
-            value={confirmarClave}
-            onChange={(e) => setConfirmarClave(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-[#0C3B75] focus:outline-none"
+            value={confirmar}
+            onChange={(e) => setConfirmar(e.target.value)}
+            required
+            style={{
+              padding: '0.8rem 1rem',
+              borderRadius: '10px',
+              border: '1px solid #ccc',
+              fontSize: '0.95rem',
+            }}
           />
 
           <button
             type="submit"
             disabled={cargando}
-            className={`w-full p-3 rounded-lg text-white font-semibold transition ${
-              cargando
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-[#0C3B75] hover:bg-[#154FA2]'
-            }`}
+            style={{
+              background: cargando ? '#ccc' : '#0C3B75',
+              color: 'white',
+              border: 'none',
+              padding: '0.9rem',
+              borderRadius: '10px',
+              cursor: cargando ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: '1rem',
+              transition: '0.3s',
+            }}
+            onMouseOver={(e) => !cargando && (e.currentTarget.style.background = '#154FA2')}
+            onMouseOut={(e) => !cargando && (e.currentTarget.style.background = '#0C3B75')}
           >
-            {cargando ? 'Actualizando...' : 'Guardar nueva contraseña'}
+            {cargando ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>
         </form>
 
         {mensaje && (
           <p
-            className={`mt-4 font-medium ${
-              mensaje.startsWith('✅') ? 'text-green-600' : 'text-red-600'
-            }`}
+            style={{
+              marginTop: '1rem',
+              color: mensaje.startsWith('✅') ? 'green' : 'red',
+              fontWeight: 500,
+              lineHeight: 1.4,
+            }}
           >
             {mensaje}
           </p>
         )}
 
-        <footer className="mt-8 text-gray-500 text-xs">
+        <footer style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#777' }}>
           © {new Date().getFullYear()} Provisión L&M S.A.S.
         </footer>
       </div>

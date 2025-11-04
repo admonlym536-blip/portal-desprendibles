@@ -4,20 +4,38 @@ import { supabase } from '@/lib/supabaseClient'
 
 export default function TestPage() {
   const [empleados, setEmpleados] = useState<any[]>([])
+  const [filteredEmpleados, setFilteredEmpleados] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const fetchEmpleados = async () => {
-      const { data, error } = await supabase.from('empleados').select('*')
+      const { data, error } = await supabase
+        .from('empleados')
+        .select('id, documento, nombre, correo, id_provision')
+
       if (error) {
         console.error('Error al obtener empleados:', error)
       } else {
         setEmpleados(data || [])
+        setFilteredEmpleados(data || [])
       }
       setLoading(false)
     }
     fetchEmpleados()
   }, [])
+
+  // 🔎 Filtro en tiempo real
+  useEffect(() => {
+    const texto = search.toLowerCase()
+    const filtrados = empleados.filter(
+      (emp) =>
+        emp.nombre?.toLowerCase().includes(texto) ||
+        emp.documento?.toString().includes(texto) ||
+        emp.id_provision?.toLowerCase().includes(texto)
+    )
+    setFilteredEmpleados(filtrados)
+  }, [search, empleados])
 
   return (
     <main
@@ -29,51 +47,76 @@ export default function TestPage() {
         color: '#0C3B75',
       }}
     >
-      {/* Encabezado */}
+      {/* Logo centrado */}
       <div
         style={{
           display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
-          gap: '15px',
           marginBottom: '25px',
         }}
       >
-        <div
+        <img
+          src="/Logo_Provision.jpg"
+          alt="Logo Provisión L&M"
           style={{
-            width: '90px',
-            height: '90px',
-            backgroundColor: '#fff',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-            border: '2px solid #0C3B75',
+            width: '160px',
+            height: 'auto',
+            objectFit: 'contain',
+            borderRadius: '12px',
           }}
-        >
-          <img src="/Logo_Provision.jpg" alt="Logo Provisión L&M" width={70} height={70} />
-        </div>
-
-        <h1 style={{ fontSize: '28px', margin: 0 }}>
-          ✅ Conexión exitosa con{' '}
-          <span style={{ color: '#009FE3' }}>Supabase</span>
-        </h1>
+        />
       </div>
 
-      {/* Título de la tabla */}
-      <h2 style={{ marginTop: '25px', color: '#4BB543' }}>Lista de empleados</h2>
+      {/* Título */}
+      <h2
+        style={{
+          textAlign: 'center',
+          marginBottom: '15px',
+          color: '#0C3B75',
+          fontWeight: 700,
+        }}
+      >
+        Lista de empleados
+      </h2>
+
+      {/* 🔎 Buscador */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '25px',
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Buscar por nombre, documento o ID Provisión..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: '60%',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            border: '1px solid #ccc',
+            fontSize: '0.95rem',
+            outlineColor: '#0C3B75',
+          }}
+        />
+      </div>
 
       {/* Contenido */}
       {loading ? (
-        <p>Cargando datos...</p>
-      ) : empleados.length === 0 ? (
-        <p style={{ color: '#B58900' }}>⚠️ No hay empleados registrados.</p>
+        <p style={{ textAlign: 'center' }}>Cargando datos...</p>
+      ) : filteredEmpleados.length === 0 ? (
+        <p style={{ color: '#B58900', textAlign: 'center' }}>
+          ⚠️ No se encontraron empleados con ese criterio.
+        </p>
       ) : (
         <table
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            marginTop: '20px',
+            marginTop: '10px',
             boxShadow: '0 3px 12px rgba(0,0,0,0.1)',
             borderRadius: '8px',
             overflow: 'hidden',
@@ -81,20 +124,24 @@ export default function TestPage() {
         >
           <thead>
             <tr style={{ background: '#0C3B75', color: '#FFFFFF' }}>
+              <th style={{ padding: '12px', textAlign: 'left' }}>#</th>
+              <th style={{ padding: '12px', textAlign: 'left' }}>ID Provisión</th>
               <th style={{ padding: '12px', textAlign: 'left' }}>Documento</th>
               <th style={{ padding: '12px', textAlign: 'left' }}>Nombre</th>
               <th style={{ padding: '12px', textAlign: 'left' }}>Correo</th>
             </tr>
           </thead>
           <tbody>
-            {empleados.map((emp) => (
+            {filteredEmpleados.map((emp, index) => (
               <tr
                 key={emp.id}
                 style={{
-                  background: '#F9FBFD',
+                  background: index % 2 === 0 ? '#F9FBFD' : '#FFFFFF',
                   borderBottom: '1px solid #E0E0E0',
                 }}
               >
+                <td style={{ padding: '12px', fontWeight: 600 }}>{index + 1}</td>
+                <td style={{ padding: '12px' }}>{emp.id_provision || '—'}</td>
                 <td style={{ padding: '12px' }}>{emp.documento}</td>
                 <td style={{ padding: '12px' }}>{emp.nombre}</td>
                 <td style={{ padding: '12px', color: '#009FE3' }}>{emp.correo}</td>
