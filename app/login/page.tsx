@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 import { FileText } from 'lucide-react'
@@ -13,6 +14,7 @@ interface Desprendible {
 }
 
 export default function PortalDesprendibles() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +22,16 @@ export default function PortalDesprendibles() {
   const [cargando, setCargando] = useState(false)
   const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
 
-  // ✅ Verificar sesión activa y traer datos del empleado
+  // ✅ Bloquear "Atrás" cuando el usuario deba cambiar la clave
+  useEffect(() => {
+    const handlePopState = () => {
+      router.replace('/recuperar-clave')
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [router])
+
+  // ✅ Verificar sesión activa
   useEffect(() => {
     const verificarSesion = async () => {
       const { data } = await supabase.auth.getUser()
@@ -32,29 +43,22 @@ export default function PortalDesprendibles() {
       const usuario = data.user
       setUser(usuario)
 
-      // 🔍 Buscar datos del empleado por correo
-      const { data: empleado, error } = await supabase
+      const { data: empleado } = await supabase
         .from('empleados')
-        .select('nombre, documento')
+        .select('nombre, documento, debe_cambiar_password')
         .eq('correo', usuario.email)
         .single()
 
-      if (!error && empleado) {
-        setUser((prev: any) => ({
-          ...prev,
-          user_metadata: {
-            ...prev.user_metadata,
-            nombre: empleado.nombre,
-            documento: empleado.documento,
-          },
-        }))
+      if (empleado?.debe_cambiar_password) {
+        router.replace('/recuperar-clave')
+        return
       }
 
       await cargarDesprendibles(usuario)
     }
 
     verificarSesion()
-  }, [])
+  }, [router])
 
   // ✅ Inicio de sesión
   const handleLogin = async (e: React.FormEvent) => {
@@ -62,14 +66,29 @@ export default function PortalDesprendibles() {
     setMensaje('')
     setCargando(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setMensaje('❌ Credenciales incorrectas')
       setCargando(false)
+      return
+    }
+
+    const { data: empleado, error: empError } = await supabase
+      .from('empleados')
+      .select('debe_cambiar_password')
+      .eq('correo', email)
+      .single()
+
+    if (empError || !empleado) {
+      setMensaje('⚠️ Usuario no encontrado en empleados')
+      setCargando(false)
+      return
+    }
+
+    if (password === 'temporal123' || empleado.debe_cambiar_password) {
+      setMensaje('🔐 Debes cambiar tu contraseña antes de continuar...')
+      setTimeout(() => router.push('/recuperar-clave'), 1500)
       return
     }
 
@@ -84,40 +103,28 @@ export default function PortalDesprendibles() {
     }, 1000)
   }
 
-  // ✅ Cargar desprendibles según documento o correo
+  // ✅ Cargar desprendibles
   const cargarDesprendibles = async (usuario: any) => {
     try {
       let documento = usuario.user_metadata?.documento
-
       if (!documento) {
-        const { data: empleado, error } = await supabase
+        const { data: empleado } = await supabase
           .from('empleados')
           .select('documento')
           .eq('correo', usuario.email)
           .single()
-
-        if (error || !empleado) {
-          console.warn('⚠️ No se encontró documento para:', usuario.email)
-          return
-        }
-
-        documento = empleado.documento
+        documento = empleado?.documento
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('desprendibles')
         .select('*')
         .eq('documento', documento)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('❌ Error al obtener desprendibles:', error.message)
-        return
-      }
-
       setDesprendibles(data || [])
     } catch (err) {
-      console.error('Error general al cargar desprendibles:', err)
+      console.error('Error al cargar desprendibles:', err)
     }
   }
 
@@ -129,10 +136,11 @@ export default function PortalDesprendibles() {
     setPassword('')
     setMensaje('')
     setDesprendibles([])
+    router.replace('/login')
   }
 
   // ---------------------------------------------------------------
-  // 🔷 LOGIN
+  // 🔷 LOGIN VISUAL
   // ---------------------------------------------------------------
   if (!user) {
     return (
@@ -172,10 +180,10 @@ export default function PortalDesprendibles() {
           </div>
 
           <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: '700' }}>
-            Portal de Desprendibles
+            Portal de Empleados
           </h2>
           <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Inicia sesión con tu correo corporativo
+            Inicia sesión con tu correo
           </p>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -228,6 +236,21 @@ export default function PortalDesprendibles() {
             </button>
           </form>
 
+          <div style={{ marginTop: '1rem' }}>
+            <a
+              href="/recuperar-clave"
+              style={{
+                color: '#0C3B75',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                textDecoration: 'underline',
+                cursor: 'pointer',
+              }}
+            >
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
+
           {mensaje && (
             <p
               style={{
@@ -249,7 +272,7 @@ export default function PortalDesprendibles() {
   }
 
   // ---------------------------------------------------------------
-  // 🔷 PORTAL DEL EMPLEADO
+  // 🔷 PORTAL DEL EMPLEADO (con bienvenida incluida 👋)
   // ---------------------------------------------------------------
   return (
     <div
@@ -285,7 +308,7 @@ export default function PortalDesprendibles() {
             <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Portal del Empleado</h2>
             <p style={{ margin: 0, fontSize: '0.9rem', color: '#DDE6F2' }}>
               {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'} —{' '}
-              {user.user_metadata?.documento || ''}
+              {user.user_metadata?.id_provision || ''}
             </p>
           </div>
         </div>
@@ -300,21 +323,18 @@ export default function PortalDesprendibles() {
             borderRadius: '8px',
             cursor: 'pointer',
             fontWeight: 600,
-            transition: '0.3s',
           }}
-          onMouseOver={(e) => (e.currentTarget.style.background = '#C62828')}
-          onMouseOut={(e) => (e.currentTarget.style.background = '#E53935')}
         >
           Cerrar sesión
         </button>
       </header>
 
-      <div style={{ textAlign: 'center', marginTop: '2.5rem', animation: 'fadeIn 1.5s ease-in-out' }}>
-        <h3 style={{ color: '#0C3B75', fontWeight: 700, fontSize: '1.3rem', marginBottom: '0.5rem' }}>
+      <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+        <h3 style={{ color: '#0C3B75', fontWeight: 700, fontSize: '1.3rem' }}>
           👋 Bienvenido(a), {user.user_metadata?.nombre?.split(' ')[0] || 'Empleado'}!
         </h3>
         <p style={{ color: '#444', fontSize: '1rem' }}>
-          Aquí puedes descargar tus desprendibles de pago más recientes.
+          Aquí puedes descargar tus certificados más recientes.
         </p>
       </div>
 
@@ -333,7 +353,7 @@ export default function PortalDesprendibles() {
             <tr>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Periodo</th>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Tipo de Pago</th>
-              <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Fecha de Subida</th>
+              <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Fecha</th>
               <th style={{ textAlign: 'center', padding: '0.9rem 1.2rem' }}>Descargar</th>
             </tr>
           </thead>
@@ -385,25 +405,9 @@ export default function PortalDesprendibles() {
         </table>
       </main>
 
-      <footer
-        style={{
-          textAlign: 'center',
-          padding: '1rem',
-          color: '#777',
-          fontSize: '0.8rem',
-        }}
-      >
+      <footer style={{ textAlign: 'center', padding: '1rem', color: '#777', fontSize: '0.8rem' }}>
         © {new Date().getFullYear()} Provisión L&M S.A.S. — Todos los derechos reservados.
       </footer>
-
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}
-      </style>
     </div>
   )
 }
