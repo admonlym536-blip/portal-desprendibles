@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 
-export default function RecuperarClave() {
+export default function CambiarClave() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [nueva, setNueva] = useState('')
@@ -26,21 +26,15 @@ export default function RecuperarClave() {
     verificarSesion()
   }, [router])
 
-  // ✅ Bloquear botón “Atrás” y cerrar sesión si no cambió la clave
+  // ✅ Bloquear botón “Atrás” solo si intenta devolverse manualmente
   useEffect(() => {
-    window.history.pushState(null, '', window.location.href)
-
-    const bloquearAtras = async () => {
-      if (!claveCambiada) {
-        await supabase.auth.signOut()
-        router.replace('/login')
-      }
+    const bloquearAtras = () => {
+      window.history.pushState(null, '', window.location.href)
     }
-
-    const manejarPop = () => bloquearAtras()
-    window.addEventListener('popstate', manejarPop)
-    return () => window.removeEventListener('popstate', manejarPop)
-  }, [router, claveCambiada])
+    bloquearAtras()
+    window.addEventListener('popstate', bloquearAtras)
+    return () => window.removeEventListener('popstate', bloquearAtras)
+  }, [])
 
   // ✅ Cambiar contraseña
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -61,17 +55,21 @@ export default function RecuperarClave() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: nueva })
-      if (error) throw error
+      // 🔹 Actualizar contraseña en Supabase Auth
+      const { error: authError } = await supabase.auth.updateUser({ password: nueva })
+      if (authError) throw authError
 
-      await supabase
-        .from('empleados')
-        .update({ debe_cambiar_password: false })
-        .eq('correo', user.email)
+      // 🔹 Actualizar campo en la tabla empleados solo si hay correo
+      if (user?.email) {
+        await supabase
+          .from('empleados')
+          .update({ debe_cambiar_password: false })
+          .eq('correo', user.email)
+      }
 
       setClaveCambiada(true)
       setMensaje('✅ Tu contraseña fue cambiada correctamente. Serás redirigido al inicio de sesión...')
-      
+
       // 🔐 Cerrar sesión y redirigir al login luego de 2.5 s
       setTimeout(async () => {
         await supabase.auth.signOut()
@@ -129,7 +127,10 @@ export default function RecuperarClave() {
           Ingresa y confirma tu nueva contraseña para continuar.
         </p>
 
-        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form
+          onSubmit={handleChangePassword}
+          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        >
           <input
             type="password"
             placeholder="Nueva contraseña"

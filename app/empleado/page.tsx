@@ -30,10 +30,10 @@ export default function EmpleadoDesprendibles() {
 
       const correo = userData.user.email
 
-      // 2️⃣ Buscar empleado por correo
+      // 2️⃣ Buscar empleado por correo, incluyendo id_provision
       const { data: emp, error: empError } = await supabase
         .from('empleados')
-        .select('id, nombre, documento')
+        .select('id, nombre, documento, id_provision')
         .eq('correo', correo)
         .maybeSingle()
 
@@ -75,17 +75,23 @@ export default function EmpleadoDesprendibles() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       {/* Encabezado */}
-      <header style={{
-        backgroundColor: '#0C3B75',
-        color: 'white',
-        padding: '1rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      <header
+        style={{
+          backgroundColor: '#0C3B75',
+          color: 'white',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <div>
           <h2 style={{ margin: 0 }}>Portal del Empleado</h2>
-          {empleado && <p style={{ margin: 0, fontSize: '0.9rem' }}>{empleado.nombre} — {empleado.documento}</p>}
+          {empleado && (
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>
+              {empleado.nombre} — {empleado.id_provision || 'Sin ID'}
+            </p>
+          )}
         </div>
         <button
           onClick={handleLogout}
@@ -95,7 +101,7 @@ export default function EmpleadoDesprendibles() {
             padding: '0.5rem 1rem',
             color: 'white',
             borderRadius: '6px',
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           Cerrar sesión
@@ -138,7 +144,11 @@ export default function EmpleadoDesprendibles() {
                       href={d.url_pdf}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#22c55e', fontWeight: 'bold', textDecoration: 'none' }}
+                      style={{
+                        color: '#22c55e',
+                        fontWeight: 'bold',
+                        textDecoration: 'none',
+                      }}
                     >
                       📄 Descargar
                     </a>

@@ -10,22 +10,24 @@ export default function TestPage() {
 
   useEffect(() => {
     const fetchEmpleados = async () => {
+      // ✅ Trae todos los campos relevantes (incluye id_provision)
       const { data, error } = await supabase
         .from('empleados')
-        .select('id, documento, nombre, correo, id_provision')
+        .select('id, id_provision, documento, nombre, correo')
 
       if (error) {
-        console.error('Error al obtener empleados:', error)
+        console.error('❌ Error al obtener empleados:', error.message)
       } else {
         setEmpleados(data || [])
         setFilteredEmpleados(data || [])
       }
       setLoading(false)
     }
+
     fetchEmpleados()
   }, [])
 
-  // 🔎 Filtro en tiempo real
+  // 🔎 Filtro en tiempo real (busca por nombre, documento o id_provision)
   useEffect(() => {
     const texto = search.toLowerCase()
     const filtrados = empleados.filter(

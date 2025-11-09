@@ -1,52 +1,28 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 
 export default function RecuperarClave() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [email, setEmail] = useState('')
   const [nueva, setNueva] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [claveCambiada, setClaveCambiada] = useState(false)
 
-  // ✅ Verificar sesión (si no hay, redirigir)
-  useEffect(() => {
-    const verificarSesion = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (!data.user) {
-        router.replace('/login')
-        return
-      }
-      setUser(data.user)
-    }
-    verificarSesion()
-  }, [router])
-
-  // ✅ Bloquear botón “Atrás” completamente y cerrar sesión si no cambió la clave
-  useEffect(() => {
-    // 🔹 Evitar que el usuario retroceda al portal
-    window.history.pushState(null, '', window.location.href)
-    const bloquearAtras = async () => {
-      if (!claveCambiada) {
-        await supabase.auth.signOut()
-        router.replace('/login')
-      }
-    }
-
-    const manejarPop = () => bloquearAtras()
-    window.addEventListener('popstate', manejarPop)
-    return () => window.removeEventListener('popstate', manejarPop)
-  }, [router, claveCambiada])
-
-  // ✅ Cambiar contraseña
+  // ✅ Cambiar contraseña sin enlace
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setMensaje('')
     setCargando(true)
+
+    if (!email || !nueva || !confirmar) {
+      setMensaje('⚠️ Todos los campos son obligatorios.')
+      setCargando(false)
+      return
+    }
 
     if (nueva !== confirmar) {
       setMensaje('⚠️ Las contraseñas no coinciden.')
@@ -61,24 +37,42 @@ export default function RecuperarClave() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: nueva })
-      if (error) throw error
+      // 🔹 Buscar usuario por correo
+      const { data: usuario } = await supabase
+        .from('empleados')
+        .select('correo')
+        .eq('correo', email)
+        .single()
 
+      if (!usuario) {
+        setMensaje('❌ No existe un empleado con ese correo.')
+        setCargando(false)
+        return
+      }
+
+      // 🔹 Actualizar contraseña (requiere autenticación de servicio)
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: nueva, // Esto genera sesión si es válida
+      })
+
+      if (error) {
+        // Si la contraseña actual no sirve, forzar actualización
+        const { error: resetError } = await supabase.auth.updateUser({ password: nueva })
+        if (resetError) throw resetError
+      }
+
+      // 🔹 Actualizar flag de cambio de clave
       await supabase
         .from('empleados')
         .update({ debe_cambiar_password: false })
-        .eq('correo', user.email)
+        .eq('correo', email)
 
-      setClaveCambiada(true)
-      setMensaje('✅ Contraseña actualizada correctamente.')
-
-      // 🔐 Cerrar sesión y redirigir al login
-      setTimeout(async () => {
-        await supabase.auth.signOut()
-        router.replace('/login')
-      }, 1500)
+      setMensaje('✅ Contraseña actualizada correctamente. Ahora puedes iniciar sesión.')
+      setTimeout(() => router.replace('/login'), 2500)
     } catch (err) {
-      setMensaje('❌ Error al cambiar la contraseña.')
+      console.error(err)
+      setMensaje('❌ Error al actualizar la contraseña.')
     } finally {
       setCargando(false)
     }
@@ -122,13 +116,27 @@ export default function RecuperarClave() {
         </div>
 
         <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: 700 }}>
-          Cambiar Contraseña
+          Recuperar Contraseña
         </h2>
         <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Ingresa y confirma tu nueva contraseña para continuar.
+          Ingresa tu correo y una nueva contraseña para restablecer tu acceso.
         </p>
 
         <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{
+              padding: '0.8rem 1rem',
+              borderRadius: '10px',
+              border: '1px solid #ccc',
+              fontSize: '0.95rem',
+            }}
+          />
+
           <input
             type="password"
             placeholder="Nueva contraseña"
@@ -145,7 +153,7 @@ export default function RecuperarClave() {
 
           <input
             type="password"
-            placeholder="Confirmar nueva contraseña"
+            placeholder="Confirmar contraseña"
             value={confirmar}
             onChange={(e) => setConfirmar(e.target.value)}
             required
@@ -169,9 +177,12 @@ export default function RecuperarClave() {
               cursor: cargando ? 'not-allowed' : 'pointer',
               fontWeight: 600,
               fontSize: '1rem',
+              transition: '0.3s',
             }}
+            onMouseOver={(e) => !cargando && (e.currentTarget.style.background = '#154FA2')}
+            onMouseOut={(e) => !cargando && (e.currentTarget.style.background = '#0C3B75')}
           >
-            {cargando ? 'Actualizando...' : 'Actualizar contraseña'}
+            {cargando ? 'Actualizando...' : 'Cambiar contraseña'}
           </button>
         </form>
 
@@ -181,6 +192,7 @@ export default function RecuperarClave() {
               marginTop: '1rem',
               color: mensaje.startsWith('✅') ? 'green' : 'red',
               fontWeight: 500,
+              lineHeight: 1.4,
             }}
           >
             {mensaje}

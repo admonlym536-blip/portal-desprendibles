@@ -8,28 +8,41 @@ export default function AdminUploadMultiple() {
 
   const handleUpload = async () => {
     if (!files || files.length === 0) {
-      setMensaje('Por favor selecciona uno o más archivos PDF.')
+      setMensaje('⚠️ Por favor selecciona uno o más archivos PDF.')
       return
     }
 
     setSubiendo(true)
-    setMensaje('Subiendo archivos...')
+    setMensaje('📤 Subiendo archivos...')
 
     const formData = new FormData()
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i])
     }
 
-    const res = await fetch('/api/upload-multiple', {
-      method: 'POST',
-      body: formData,
-    })
+    try {
+      const res = await fetch('/api/upload-multiple', {
+        method: 'POST',
+        body: formData,
+      })
 
-    const result = await res.json()
-    if (result.success) {
-      setMensaje(result.resultados.join('\n'))
-    } else {
-      setMensaje('❌ Error: ' + (result.error || 'Error desconocido'))
+      const result = await res.json()
+
+      // ✅ Ajuste: Mostrar resultados detallados
+      if (result.resultados && Array.isArray(result.resultados)) {
+  // Si el backend devuelve solo strings (no objetos)
+  const resumen = result.resultados
+    .map((r: any) => (typeof r === 'string' ? `• ${r}` : `• ${r.archivo || 'Archivo'}: ${r.status || r.mensaje || 'OK'}`))
+    .join('\n')
+  setMensaje(resumen)
+      } else if (result.error) {
+        setMensaje('❌ Error: ' + result.error)
+      } else {
+        setMensaje('❌ Ocurrió un error desconocido.')
+      }
+    } catch (error) {
+      console.error(error)
+      setMensaje('❌ Error de conexión con el servidor.')
     }
 
     setSubiendo(false)
@@ -42,7 +55,7 @@ export default function AdminUploadMultiple() {
       <p style={{ fontSize: '0.9rem', color: '#555' }}>
         📂 Selecciona varios archivos PDF con el formato:
         <br />
-        <strong>Documento_Periodo.pdf</strong> — ejemplo: <em>100000001_Enero2025.pdf</em>
+        <strong>Documento_Periodo.pdf</strong> — ejemplo: <em>10000001_Enero2025.pdf</em>
       </p>
 
       <input
@@ -88,4 +101,3 @@ export default function AdminUploadMultiple() {
     </div>
   )
 }
-

@@ -34,32 +34,48 @@ export default function PortalDesprendibles() {
   }, [router])
 
   useEffect(() => {
-    const verificarSesion = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (!data.user) {
-        setUser(null)
-        return
-      }
-
-      const usuario = data.user
-      setUser(usuario)
-
-      const { data: empleado } = await supabase
-        .from('empleados')
-        .select('nombre, documento, debe_cambiar_password')
-        .eq('correo', usuario.email)
-        .single()
-
-      if (empleado?.debe_cambiar_password) {
-        router.replace('/recuperar-clave')
-        return
-      }
-
-      await cargarDesprendibles(usuario)
+  const verificarSesion = async () => {
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) {
+      setUser(null)
+      return
     }
 
-    verificarSesion()
-  }, [router])
+    const usuario = data.user
+    setUser(usuario)
+
+    // 🔹 Buscar empleado asociado al correo
+    const { data: empleado } = await supabase
+      .from('empleados')
+      .select('nombre, documento, id_provision, debe_cambiar_password')
+      .eq('correo', usuario.email)
+      .single()
+
+    if (!empleado) {
+      setMensaje('⚠️ No se encontró el usuario en empleados.')
+      return
+    }
+
+    // 🔹 Si requiere cambiar contraseña
+    if (empleado.debe_cambiar_password) {
+      router.replace('/recuperar-clave')
+      return
+    }
+
+    // 🔹 Actualizar metadatos en Auth (sincronizar)
+    await supabase.auth.updateUser({
+      data: {
+        nombre: empleado.nombre,
+        documento: empleado.documento,
+        id_provision: empleado.id_provision,
+      },
+    })
+
+    await cargarDesprendibles(usuario)
+  }
+
+  verificarSesion()
+}, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -497,3 +513,5 @@ export default function PortalDesprendibles() {
     </div>
   )
 }
+
+
