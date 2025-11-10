@@ -1,11 +1,8 @@
 {
-  "build": {
-  "ignore": ["supabase/functions"]
-}
-,
   "functions": {
-    "api/**/*.ts": {
+    "api/**/*.js": {
       "runtime": "nodejs18.x"
     }
-  }
+  },
+  "ignore": ["supabase/functions"]
 }
