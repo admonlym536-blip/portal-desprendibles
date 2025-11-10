@@ -25,6 +25,14 @@ export default function PortalDesprendibles() {
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
 
+  // ✅ Meta viewport para móviles
+  useEffect(() => {
+    const meta = document.createElement('meta')
+    meta.name = 'viewport'
+    meta.content = 'width=device-width, initial-scale=1'
+    document.head.appendChild(meta)
+  }, [])
+
   useEffect(() => {
     const handlePopState = () => {
       router.replace('/recuperar-clave')
@@ -34,48 +42,45 @@ export default function PortalDesprendibles() {
   }, [router])
 
   useEffect(() => {
-  const verificarSesion = async () => {
-    const { data } = await supabase.auth.getUser()
-    if (!data.user) {
-      setUser(null)
-      return
+    const verificarSesion = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) {
+        setUser(null)
+        return
+      }
+
+      const usuario = data.user
+      setUser(usuario)
+
+      const { data: empleado } = await supabase
+        .from('empleados')
+        .select('nombre, documento, id_provision, debe_cambiar_password')
+        .eq('correo', usuario.email)
+        .single()
+
+      if (!empleado) {
+        setMensaje('⚠️ No se encontró el usuario en empleados.')
+        return
+      }
+
+      if (empleado.debe_cambiar_password) {
+        router.replace('/recuperar-clave')
+        return
+      }
+
+      await supabase.auth.updateUser({
+        data: {
+          nombre: empleado.nombre,
+          documento: empleado.documento,
+          id_provision: empleado.id_provision,
+        },
+      })
+
+      await cargarDesprendibles(usuario)
     }
 
-    const usuario = data.user
-    setUser(usuario)
-
-    // 🔹 Buscar empleado asociado al correo
-    const { data: empleado } = await supabase
-      .from('empleados')
-      .select('nombre, documento, id_provision, debe_cambiar_password')
-      .eq('correo', usuario.email)
-      .single()
-
-    if (!empleado) {
-      setMensaje('⚠️ No se encontró el usuario en empleados.')
-      return
-    }
-
-    // 🔹 Si requiere cambiar contraseña
-    if (empleado.debe_cambiar_password) {
-      router.replace('/recuperar-clave')
-      return
-    }
-
-    // 🔹 Actualizar metadatos en Auth (sincronizar)
-    await supabase.auth.updateUser({
-      data: {
-        nombre: empleado.nombre,
-        documento: empleado.documento,
-        id_provision: empleado.id_provision,
-      },
-    })
-
-    await cargarDesprendibles(usuario)
-  }
-
-  verificarSesion()
-}, [router])
+    verificarSesion()
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -174,6 +179,7 @@ export default function PortalDesprendibles() {
           background: 'linear-gradient(135deg, #0C3B75 40%, #0A2E5A 100%)',
           color: 'white',
           fontFamily: 'Segoe UI, Roboto, sans-serif',
+          padding: '1rem',
         }}
       >
         <div
@@ -249,8 +255,6 @@ export default function PortalDesprendibles() {
                 fontSize: '1rem',
                 transition: '0.3s',
               }}
-              onMouseOver={(e) => !cargando && (e.currentTarget.style.background = '#154FA2')}
-              onMouseOut={(e) => !cargando && (e.currentTarget.style.background = '#0C3B75')}
             >
               {cargando ? 'Verificando...' : 'Iniciar sesión'}
             </button>
@@ -301,34 +305,38 @@ export default function PortalDesprendibles() {
         background: 'linear-gradient(180deg, #F3F7FB 0%, #E8EEF5 100%)',
         fontFamily: 'Segoe UI, Roboto, sans-serif',
         color: '#333',
+        width: '100%',
+        overflowX: 'hidden',
       }}
     >
       <header
         style={{
           background: '#0C3B75',
           color: 'white',
-          padding: '1rem 2rem',
+          padding: '1rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.8rem',
           boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '50px', height: '50px', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <div style={{ width: '45px', height: '45px', position: 'relative' }}>
             <Image
               src="/Logo_Provision.jpg"
               alt="Logo Provisión L&M"
               fill
               style={{ objectFit: 'contain', borderRadius: '6px' }}
-              sizes="50px"
+              sizes="45px"
             />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Portal del Empleado</h2>
+            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Portal del Empleado</h2>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#DDE6F2' }}>
-              {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'} —{' '}
-              {user.user_metadata?.id_provision || ''}
+              {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'} — ID:{' '}
+              <strong>{user.user_metadata?.id_provision || 'N/A'}</strong>
             </p>
           </div>
         </div>
@@ -350,7 +358,7 @@ export default function PortalDesprendibles() {
       </header>
 
       {/* 👋 Hola debajo del header */}
-      <div style={{ textAlign: 'center', marginTop: '1.8rem' }}>
+      <div style={{ textAlign: 'center', marginTop: '1.8rem', padding: '0 1rem' }}>
         <h3 style={{ color: '#0C3B75', fontWeight: 700, fontSize: '1.3rem' }}>
           👋 Hola, {user.user_metadata?.nombre?.split(' ')[0] || 'Empleado'}!
         </h3>
@@ -368,6 +376,7 @@ export default function PortalDesprendibles() {
           gap: '1rem',
           alignItems: 'center',
           flexWrap: 'wrap',
+          padding: '0 1rem',
         }}
       >
         <label style={{ fontWeight: 600, color: '#0C3B75' }}>Desde:</label>
@@ -439,6 +448,7 @@ export default function PortalDesprendibles() {
           borderRadius: '16px',
           boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
           overflow: 'hidden',
+          width: '95%',
         }}
       >
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
@@ -513,5 +523,3 @@ export default function PortalDesprendibles() {
     </div>
   )
 }
-
-
