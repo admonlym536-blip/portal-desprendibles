@@ -296,7 +296,7 @@ export default function PortalDesprendibles() {
   }
 
   // ---------------------------------------------------------------
-  // PORTAL DEL EMPLEADO (Hola en lugar de Bienvenido)
+  // PORTAL DEL EMPLEADO
   // ---------------------------------------------------------------
   return (
     <div
@@ -317,26 +317,28 @@ export default function PortalDesprendibles() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.8rem',
+          flexWrap: 'nowrap',
           boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div style={{ width: '45px', height: '45px', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ width: '40px', height: '40px', position: 'relative' }}>
             <Image
               src="/Logo_Provision.jpg"
               alt="Logo Provisión L&M"
               fill
               style={{ objectFit: 'contain', borderRadius: '6px' }}
-              sizes="45px"
+              sizes="40px"
             />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Portal del Empleado</h2>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#DDE6F2' }}>
-              {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'} — ID:{' '}
-              <strong>{user.user_metadata?.id_provision || 'N/A'}</strong>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.1 }}>
+              Portal del Empleado
+            </h2>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#DDE6F2', lineHeight: 1.3 }}>
+              {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'}
+              <br />
+              ID: <strong>{user.user_metadata?.id_provision || 'N/A'}</strong>
             </p>
           </div>
         </div>
@@ -351,6 +353,7 @@ export default function PortalDesprendibles() {
             borderRadius: '8px',
             cursor: 'pointer',
             fontWeight: 600,
+            whiteSpace: 'nowrap',
           }}
         >
           Cerrar sesión
@@ -439,7 +442,7 @@ export default function PortalDesprendibles() {
         )}
       </div>
 
-      {/* Tabla */}
+      {/* Tabla con scroll horizontal */}
       <main
         style={{
           maxWidth: '850px',
@@ -447,11 +450,18 @@ export default function PortalDesprendibles() {
           background: 'white',
           borderRadius: '16px',
           boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
-          overflow: 'hidden',
+          overflowX: 'auto',
           width: '95%',
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '0.95rem',
+            minWidth: '600px',
+          }}
+        >
           <thead style={{ background: '#0C3B75', color: 'white' }}>
             <tr>
               <th style={{ textAlign: 'left', padding: '0.9rem 1.2rem' }}>Tipo de Documento</th>
@@ -469,42 +479,55 @@ export default function PortalDesprendibles() {
                 </td>
               </tr>
             ) : (
-              desprendibles.map((d) => (
-                <tr
-                  key={d.id}
-                  style={{
-                    borderBottom: '1px solid #eee',
-                    transition: 'background 0.3s',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = '#F6FAFF')}
-                  onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
-                >
-                  <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_documento || 'Desprendible'}</td>
-                  <td style={{ padding: '0.9rem 1.2rem' }}>{d.periodo}</td>
-                  <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_pago}</td>
-                  <td style={{ padding: '0.9rem 1.2rem' }}>
-                    {new Date(d.created_at).toLocaleDateString()}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '0.9rem 1.2rem' }}>
-                    <a
-                      href={d.url_pdf}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        color: '#007B55',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <FileText size={16} />
-                      Descargar
-                    </a>
-                  </td>
-                </tr>
-              ))
+              desprendibles.map((d) => {
+                const partes = d.periodo.match(/(\d+)([A-Za-z]+)(\d+)/)
+                return (
+                  <tr
+                    key={d.id}
+                    style={{
+                      borderBottom: '1px solid #eee',
+                      transition: 'background 0.3s',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = '#F6FAFF')}
+                    onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
+                  >
+                    <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_documento || 'Desprendible'}</td>
+                    <td style={{ padding: '0.9rem 1.2rem', lineHeight: '1.3rem' }}>
+                      {partes ? (
+                        <>
+                          <strong>{partes[1]}</strong>
+                          <br />
+                          {partes[2]} {partes[3]}
+                        </>
+                      ) : (
+                        d.periodo
+                      )}
+                    </td>
+                    <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_pago}</td>
+                    <td style={{ padding: '0.9rem 1.2rem' }}>
+                      {new Date(d.created_at).toLocaleDateString()}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '0.9rem 1.2rem' }}>
+                      <a
+                        href={d.url_pdf}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          color: '#007B55',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <FileText size={16} />
+                        Descargar
+                      </a>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
