@@ -4,5 +4,6 @@
       "runtime": "nodejs18.x"
     }
   },
-  "ignore": ["supabase/functions"]
+  "buildCommand": "next build",
+  "outputDirectory": ".vercel/output"
 }
