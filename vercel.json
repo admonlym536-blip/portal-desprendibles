@@ -1,0 +1,10 @@
+{
+  "build": {
+    "ignoreCommand": "echo 'Ignoring supabase/functions folder for Vercel build'"
+  },
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs18.x"
+    }
+  }
+}
