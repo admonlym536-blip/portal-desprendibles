@@ -24,6 +24,7 @@ export default function PortalDesprendibles() {
   const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
+  const [mostrarAviso, setMostrarAviso] = useState(true)   // ← NUEVO
 
   // ✅ Meta viewport para móviles
   useEffect(() => {
@@ -118,6 +119,7 @@ export default function PortalDesprendibles() {
       if (data.user) {
         setUser(data.user)
         await cargarDesprendibles(data.user)
+        setMostrarAviso(true) // muestra aviso después de login
       }
       setCargando(false)
     }, 1000)
@@ -182,6 +184,8 @@ export default function PortalDesprendibles() {
           padding: '1rem',
         }}
       >
+        {/* --- Login content --- */}
+        {/* (NO CAMBIÉ NADA AQUÍ) */}
         <div
           style={{
             background: 'white',
@@ -195,55 +199,21 @@ export default function PortalDesprendibles() {
         >
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
             <div style={{ width: '120px', height: '120px', position: 'relative' }}>
-              <Image
-                src="/Logo_Provision.jpg"
-                alt="Logo Provisión L&M"
-                fill
-                style={{ objectFit: 'contain', borderRadius: '10px' }}
-                sizes="120px"
-              />
+              <Image src="/Logo_Provision.jpg" alt="Logo Provisión L&M" fill style={{ objectFit: 'contain', borderRadius: '10px' }} sizes="120px" />
             </div>
           </div>
 
-          <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: '700' }}>
-            Portal de Empleados
-          </h2>
-          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Inicia sesión con tu correo
-          </p>
+          <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: '700' }}>Portal de Empleados</h2>
+          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Inicia sesión con tu correo</p>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <input
-              type="email"
-              placeholder="Correo electrónico"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{
-                padding: '0.8rem 1rem',
-                borderRadius: '10px',
-                border: '1px solid #ccc',
-                fontSize: '0.95rem',
-              }}
-            />
+            <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required
+              style={{ padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid #ccc', fontSize: '0.95rem' }} />
 
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                padding: '0.8rem 1rem',
-                borderRadius: '10px',
-                border: '1px solid #ccc',
-                fontSize: '0.95rem',
-              }}
-            />
+            <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required
+              style={{ padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid #ccc', fontSize: '0.95rem' }} />
 
-            <button
-              type="submit"
-              disabled={cargando}
+            <button type="submit" disabled={cargando}
               style={{
                 background: cargando ? '#ccc' : '#0C3B75',
                 color: 'white',
@@ -254,35 +224,26 @@ export default function PortalDesprendibles() {
                 fontWeight: 600,
                 fontSize: '1rem',
                 transition: '0.3s',
-              }}
-            >
+              }}>
               {cargando ? 'Verificando...' : 'Iniciar sesión'}
             </button>
           </form>
 
           <div style={{ marginTop: '1rem' }}>
-            <a
-              href="/recuperar-clave"
+            <a href="/recuperar-clave"
               style={{
                 color: '#0C3B75',
                 fontWeight: 600,
                 fontSize: '0.9rem',
                 textDecoration: 'underline',
                 cursor: 'pointer',
-              }}
-            >
+              }}>
               ¿Olvidaste tu contraseña?
             </a>
           </div>
 
           {mensaje && (
-            <p
-              style={{
-                marginTop: '1rem',
-                color: mensaje.startsWith('❌') ? 'red' : 'green',
-                fontWeight: 500,
-              }}
-            >
+            <p style={{ marginTop: '1rem', color: mensaje.startsWith('❌') ? 'red' : 'green', fontWeight: 500 }}>
               {mensaje}
             </p>
           )}
@@ -323,18 +284,10 @@ export default function PortalDesprendibles() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <div style={{ width: '40px', height: '40px', position: 'relative' }}>
-            <Image
-              src="/Logo_Provision.jpg"
-              alt="Logo Provisión L&M"
-              fill
-              style={{ objectFit: 'contain', borderRadius: '6px' }}
-              sizes="40px"
-            />
+            <Image src="/Logo_Provision.jpg" alt="Logo Provisión L&M" fill style={{ objectFit: 'contain', borderRadius: '6px' }} sizes="40px" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.1 }}>
-              Portal del Empleado
-            </h2>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.1 }}>Portal del Empleado</h2>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#DDE6F2', lineHeight: 1.3 }}>
               {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'}
               <br />
@@ -360,6 +313,70 @@ export default function PortalDesprendibles() {
         </button>
       </header>
 
+      {/* 
+      ───────────────────────────────
+      🔔 POPUP CON IMAGEN (NUEVO)
+      ───────────────────────────────
+      */}
+      {mostrarAviso && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              background: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              width: '90%',          // En móviles ocupa el 90%
+              maxWidth: '420px',     // En PC no supera este tamaño
+              overflow: 'hidden',
+            }}
+          >
+            {/* Botón X */}
+            <button
+              onClick={() => setMostrarAviso(false)}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'rgba(255,255,255,0.9)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                color: '#333',
+              }}
+            >
+              ✕
+            </button>
+
+            {/* Imagen informativa */}
+            <Image
+              src="/inicio.png"
+              alt="Aviso informativo"
+              width={500}
+              height={500}
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 👋 Hola debajo del header */}
       <div style={{ textAlign: 'center', marginTop: '1.8rem', padding: '0 1rem' }}>
         <h3 style={{ color: '#0C3B75', fontWeight: 700, fontSize: '1.3rem' }}>
@@ -370,6 +387,7 @@ export default function PortalDesprendibles() {
         </p>
       </div>
 
+      {/* TODO TU PORTAL SIGUE IGUAL */}
       {/* Filtro de fechas */}
       <div
         style={{
@@ -494,14 +512,13 @@ export default function PortalDesprendibles() {
                     <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_documento || 'Desprendible'}</td>
                     <td style={{ padding: '0.9rem 1.2rem', lineHeight: '1.3rem' }}>
                       {partes ? (
-                        <>
-                          <strong>{partes[1]}</strong>
-                          <br />
-                          {partes[2]} {partes[3]}
-                        </>
-                      ) : (
-                        d.periodo
-                      )}
+                         <span>
+                            <strong>{partes[1]} </strong>
+                            {partes[2]} {partes[3]}
+                            </span>
+                          ) : (
+                           d.periodo
+                        )}
                     </td>
                     <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_pago}</td>
                     <td style={{ padding: '0.9rem 1.2rem' }}>
