@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'   // 🟡 agregué useRef
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
@@ -14,6 +14,9 @@ interface Desprendible {
   url_pdf: string
 }
 
+// 🟡 minutos de inactividad permitidos
+const INACTIVIDAD_MINUTOS = 1
+
 export default function PortalDesprendibles() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -24,7 +27,10 @@ export default function PortalDesprendibles() {
   const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
-  const [mostrarAviso, setMostrarAviso] = useState(true)   // ← NUEVO
+  const [mostrarAviso, setMostrarAviso] = useState(true)
+
+  // 🟡 referencia para el timer de inactividad
+  const inactividadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ✅ Meta viewport para móviles
   useEffect(() => {
@@ -119,7 +125,7 @@ export default function PortalDesprendibles() {
       if (data.user) {
         setUser(data.user)
         await cargarDesprendibles(data.user)
-        setMostrarAviso(true) // muestra aviso después de login
+        setMostrarAviso(true)
       }
       setCargando(false)
     }, 1000)
@@ -157,6 +163,12 @@ export default function PortalDesprendibles() {
   }
 
   const handleLogout = async () => {
+    // 🟡 limpiamos el timer si existe
+    if (inactividadTimer.current) {
+      clearTimeout(inactividadTimer.current)
+      inactividadTimer.current = null
+    }
+
     await supabase.auth.signOut()
     setUser(null)
     setEmail('')
@@ -165,6 +177,54 @@ export default function PortalDesprendibles() {
     setDesprendibles([])
     router.replace('/login')
   }
+
+  // 🟡 función que se ejecuta cuando pasa el tiempo de inactividad
+  const cerrarPorInactividad = async () => {
+    await supabase.auth.signOut()
+    alert('Tu sesión se cerró por inactividad.')
+    setUser(null)
+    router.replace('/login')
+  }
+
+  // 🟡 reinicia el contador cada vez que el usuario hace algo
+  const reiniciarInactividad = () => {
+    if (inactividadTimer.current) {
+      clearTimeout(inactividadTimer.current)
+    }
+    inactividadTimer.current = setTimeout(
+      cerrarPorInactividad,
+      INACTIVIDAD_MINUTOS * 60 * 1000
+    )
+  }
+
+  // 🟡 hook que escucha la actividad SOLO cuando hay usuario logueado
+  useEffect(() => {
+    if (!user) return
+
+    const eventos = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart']
+
+    const handleActivity = () => {
+      reiniciarInactividad()
+    }
+
+    // iniciamos el contador una vez entra al portal
+    reiniciarInactividad()
+
+    eventos.forEach((ev) => {
+      window.addEventListener(ev, handleActivity)
+    })
+
+    // limpieza cuando se desmonta o cuando el usuario cambia
+    return () => {
+      if (inactividadTimer.current) {
+        clearTimeout(inactividadTimer.current)
+        inactividadTimer.current = null
+      }
+      eventos.forEach((ev) => {
+        window.removeEventListener(ev, handleActivity)
+      })
+    }
+  }, [user])
 
   // ---------------------------------------------------------------
   // LOGIN VISUAL
@@ -184,8 +244,6 @@ export default function PortalDesprendibles() {
           padding: '1rem',
         }}
       >
-        {/* --- Login content --- */}
-        {/* (NO CAMBIÉ NADA AQUÍ) */}
         <div
           style={{
             background: 'white',
@@ -199,21 +257,55 @@ export default function PortalDesprendibles() {
         >
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
             <div style={{ width: '120px', height: '120px', position: 'relative' }}>
-              <Image src="/Logo_Provision.jpg" alt="Logo Provisión L&M" fill style={{ objectFit: 'contain', borderRadius: '10px' }} sizes="120px" />
+              <Image
+                src="/Logo_Provision.jpg"
+                alt="Logo Provisión L&M"
+                fill
+                style={{ objectFit: 'contain', borderRadius: '10px' }}
+                sizes="120px"
+              />
             </div>
           </div>
 
-          <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: '700' }}>Portal de Empleados</h2>
-          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Inicia sesión con tu correo</p>
+          <h2 style={{ color: '#0C3B75', marginBottom: '0.5rem', fontWeight: '700' }}>
+            Portal de Empleados
+          </h2>
+          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            Inicia sesión con tu correo
+          </p>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required
-              style={{ padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid #ccc', fontSize: '0.95rem' }} />
+            <input
+              type="email"
+              placeholder="Correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={{
+                padding: '0.8rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid #ccc',
+                fontSize: '0.95rem',
+              }}
+             />
 
-            <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required
-              style={{ padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid #ccc', fontSize: '0.95rem' }} />
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{
+                padding: '0.8rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid #ccc',
+                fontSize: '0.95rem',
+              }}
+            />
 
-            <button type="submit" disabled={cargando}
+            <button
+              type="submit"
+              disabled={cargando}
               style={{
                 background: cargando ? '#ccc' : '#0C3B75',
                 color: 'white',
@@ -224,26 +316,35 @@ export default function PortalDesprendibles() {
                 fontWeight: 600,
                 fontSize: '1rem',
                 transition: '0.3s',
-              }}>
+              }}
+            >
               {cargando ? 'Verificando...' : 'Iniciar sesión'}
             </button>
           </form>
 
           <div style={{ marginTop: '1rem' }}>
-            <a href="/recuperar-clave"
+            <a
+              href="/recuperar-clave"
               style={{
                 color: '#0C3B75',
                 fontWeight: 600,
                 fontSize: '0.9rem',
                 textDecoration: 'underline',
                 cursor: 'pointer',
-              }}>
+              }}
+            >
               ¿Olvidaste tu contraseña?
             </a>
           </div>
 
           {mensaje && (
-            <p style={{ marginTop: '1rem', color: mensaje.startsWith('❌') ? 'red' : 'green', fontWeight: 500 }}>
+            <p
+              style={{
+                marginTop: '1rem',
+                color: mensaje.startsWith('❌') ? 'red' : 'green',
+                fontWeight: 500,
+              }}
+            >
               {mensaje}
             </p>
           )}
@@ -284,10 +385,18 @@ export default function PortalDesprendibles() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <div style={{ width: '40px', height: '40px', position: 'relative' }}>
-            <Image src="/Logo_Provision.jpg" alt="Logo Provisión L&M" fill style={{ objectFit: 'contain', borderRadius: '6px' }} sizes="40px" />
+            <Image
+              src="/Logo_Provision.jpg"
+              alt="Logo Provisión L&M"
+              fill
+              style={{ objectFit: 'contain', borderRadius: '6px' }}
+              sizes="40px"
+            />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.1 }}>Portal del Empleado</h2>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.1 }}>
+              Portal del Empleado
+            </h2>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#DDE6F2', lineHeight: 1.3 }}>
               {user.user_metadata?.nombre?.toUpperCase() || 'Empleado'}
               <br />
@@ -313,11 +422,7 @@ export default function PortalDesprendibles() {
         </button>
       </header>
 
-      {/* 
-      ───────────────────────────────
-      🔔 POPUP CON IMAGEN (NUEVO)
-      ───────────────────────────────
-      */}
+      {/* POPUP imagen informativa */}
       {mostrarAviso && (
         <div
           style={{
@@ -339,12 +444,11 @@ export default function PortalDesprendibles() {
               background: 'white',
               borderRadius: '16px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              width: '90%',          // En móviles ocupa el 90%
-              maxWidth: '420px',     // En PC no supera este tamaño
+              width: '90%',
+              maxWidth: '420px',
               overflow: 'hidden',
             }}
           >
-            {/* Botón X */}
             <button
               onClick={() => setMostrarAviso(false)}
               style={{
@@ -365,9 +469,8 @@ export default function PortalDesprendibles() {
               ✕
             </button>
 
-            {/* Imagen informativa */}
             <Image
-              src="/inicio.png"
+              src="/inicio.png"          // la imagen que tienes ahora en public
               alt="Aviso informativo"
               width={500}
               height={500}
@@ -387,7 +490,6 @@ export default function PortalDesprendibles() {
         </p>
       </div>
 
-      {/* TODO TU PORTAL SIGUE IGUAL */}
       {/* Filtro de fechas */}
       <div
         style={{
@@ -512,13 +614,13 @@ export default function PortalDesprendibles() {
                     <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_documento || 'Desprendible'}</td>
                     <td style={{ padding: '0.9rem 1.2rem', lineHeight: '1.3rem' }}>
                       {partes ? (
-                         <span>
-                            <strong>{partes[1]} </strong>
-                            {partes[2]} {partes[3]}
-                            </span>
-                          ) : (
-                           d.periodo
-                        )}
+                        <span>
+                          <strong>{partes[1]} </strong>
+                          {partes[2]} {partes[3]}
+                        </span>
+                      ) : (
+                        d.periodo
+                      )}
                     </td>
                     <td style={{ padding: '0.9rem 1.2rem' }}>{d.tipo_pago}</td>
                     <td style={{ padding: '0.9rem 1.2rem' }}>
