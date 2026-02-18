@@ -13,44 +13,64 @@ export default function AdminUploadMultiple() {
     }
 
     setSubiendo(true)
-    setMensaje('📤 Subiendo archivos...')
+    setMensaje('📤 Iniciando carga...\n')
 
-    const formData = new FormData()
+    let resumen = ''
+    let montados = 0
+    let noMontados = 0
+
     for (let i = 0; i < files.length; i++) {
+      const formData = new FormData()
       formData.append('files', files[i])
-    }
 
-    try {
-      const res = await fetch('/api/upload-multiple', {
-        method: 'POST',
-        body: formData,
-      })
+      try {
+        const res = await fetch('/api/upload-multiple', {
+          method: 'POST',
+          body: formData,
+        })
 
-      const result = await res.json()
+        const result = await res.json()
 
-      // ✅ Ajuste: Mostrar resultados detallados
-      if (result.resultados && Array.isArray(result.resultados)) {
-  // Si el backend devuelve solo strings (no objetos)
-  const resumen = result.resultados
-    .map((r: any) => (typeof r === 'string' ? `• ${r}` : `• ${r.archivo || 'Archivo'}: ${r.status || r.mensaje || 'OK'}`))
-    .join('\n')
-  setMensaje(resumen)
-      } else if (result.error) {
-        setMensaje('❌ Error: ' + result.error)
-      } else {
-        setMensaje('❌ Ocurrió un error desconocido.')
+        if (result.detalles && result.detalles.length > 0) {
+          const detalle = result.detalles[0]
+
+          if (detalle.estado === 'MONTADO') {
+            montados++
+            resumen += `✅ ${files[i].name} → MONTADO\n`
+          } else {
+            noMontados++
+            resumen += `❌ ${files[i].name} → ${detalle.mensaje}\n`
+          }
+        } else {
+          noMontados++
+          resumen += `❌ ${files[i].name} → Error inesperado\n`
+        }
+
+      } catch (error) {
+        noMontados++
+        resumen += `❌ ${files[i].name} → Error de conexión\n`
       }
-    } catch (error) {
-      console.error(error)
-      setMensaje('❌ Error de conexión con el servidor.')
+
+      // Mostrar progreso en tiempo real
+      setMensaje(`📤 Procesando ${i + 1} de ${files.length}\n\n` + resumen)
     }
+
+    setMensaje(
+      `✅ CARGA FINALIZADA\n\n` +
+      `Total archivos: ${files.length}\n` +
+      `Montados: ${montados}\n` +
+      `No montados: ${noMontados}\n\n` +
+      resumen
+    )
 
     setSubiendo(false)
   }
 
   return (
     <div style={{ padding: '2rem', maxWidth: 650, margin: 'auto' }}>
-      <h1 style={{ color: '#0C3B75', textAlign: 'center' }}>Carga masiva de Desprendibles</h1>
+      <h1 style={{ color: '#0C3B75', textAlign: 'center' }}>
+        Carga masiva de Desprendibles
+      </h1>
 
       <p style={{ fontSize: '0.9rem', color: '#555' }}>
         📂 Selecciona varios archivos PDF con el formato:
