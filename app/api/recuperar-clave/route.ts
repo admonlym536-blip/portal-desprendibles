@@ -17,11 +17,14 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔎 Buscar usuario en Supabase Auth
+    // 🔎 Traer hasta 1000 usuarios (no solo 50)
     const { data: usersData, error: listError } =
-      await supabase.auth.admin.listUsers()
+      await supabase.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000
+      })
 
-    if (listError) {
+    if (listError || !usersData?.users) {
       return NextResponse.json(
         { error: 'Error al consultar usuarios.' },
         { status: 500 }
@@ -53,27 +56,19 @@ export async function POST(req: Request) {
     }
 
     // 🗂 Actualizar tabla empleados
-    const { error: updateEmpleadoError } = await supabase
+    await supabase
       .from('empleados')
       .update({ debe_cambiar_password: false })
       .eq('correo', email)
-
-    if (updateEmpleadoError) {
-      return NextResponse.json(
-        { error: 'Contraseña cambiada, pero error al actualizar empleado.' },
-        { status: 500 }
-      )
-    }
 
     return NextResponse.json({
       ok: true,
       mensaje: 'Contraseña actualizada correctamente.'
     })
 
-  } catch (error) {
-    console.error(error)
+  } catch (error: any) {
     return NextResponse.json(
-      { error: 'Error interno del servidor.' },
+      { error: error.message || 'Error interno del servidor.' },
       { status: 500 }
     )
   }
