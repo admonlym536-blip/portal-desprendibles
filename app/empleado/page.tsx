@@ -1,7 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+
+type Vista = 'inicio' | 'desprendibles' | 'certificados' | 'servicios'
 
 type Desprendible = {
   periodo: string
@@ -10,155 +14,867 @@ type Desprendible = {
   fecha_subida: string
 }
 
-export default function EmpleadoDesprendibles() {
+type Certificado = {
+  id: number
+  empleado_id: number
+  id_provision: string
+  documento: string
+  nombre_empleado: string
+  tipo_certificado: string
+  url_pdf: string
+  fecha_subida: string
+}
+
+export default function DashboardEmpleado() {
   const router = useRouter()
-  const [empleado, setEmpleado] = useState<any>(null)
-  const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
-  const [mensaje, setMensaje] = useState('Cargando desprendibles...')
-  const [cargando, setCargando] = useState(true)
+  const [vista, setVista] = useState<Vista>('inicio')
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setCargando(true)
-
-      // 1️⃣ Obtener usuario autenticado
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError || !userData.user) {
-        router.push('/login')
-        return
-      }
-
-      const correo = userData.user.email
-
-      // 2️⃣ Buscar empleado por correo, incluyendo id_provision
-      const { data: emp, error: empError } = await supabase
-        .from('empleados')
-        .select('id, nombre, documento, id_provision')
-        .eq('correo', correo)
-        .maybeSingle()
-
-      if (empError || !emp) {
-        setMensaje('⚠️ No se encontró un empleado asociado a este usuario.')
-        setCargando(false)
-        return
-      }
-
-      setEmpleado(emp)
-
-      // 3️⃣ Buscar desprendibles del empleado
-      const { data: desp, error: despError } = await supabase
-        .from('desprendibles')
-        .select('periodo, tipo_pago, fecha_subida, url_pdf')
-        .eq('documento', emp.documento)
-        .order('fecha_subida', { ascending: false })
-
-      if (despError) {
-        setMensaje('❌ Error al cargar desprendibles.')
-      } else if (!desp || desp.length === 0) {
-        setMensaje('⚠️ No tienes desprendibles registrados.')
-      } else {
-        setDesprendibles(desp)
-        setMensaje('')
-      }
-
-      setCargando(false)
-    }
-
-    cargarDatos()
-  }, [router])
-
-  const handleLogout = async () => {
+  const cerrarSesion = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      {/* Encabezado */}
-      <header
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        background: '#F4F7FB',
+        overflowX: 'hidden',
+      }}
+    >
+      {/* Sidebar */}
+      <aside
         style={{
-          backgroundColor: '#0C3B75',
+          width: 260,
+          background: '#0C3B75',
           color: 'white',
-          padding: '1rem 2rem',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          padding: 20,
+          boxShadow: '4px 0 12px rgba(0,0,0,0.08)',
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
         }}
       >
-        <div>
-          <h2 style={{ margin: 0 }}>Portal del Empleado</h2>
-          {empleado && (
-            <p style={{ margin: 0, fontSize: '0.9rem' }}>
-              {empleado.nombre} — {empleado.id_provision || 'Sin ID'}
-            </p>
-          )}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <Image
+            src="/Logo_Provision.jpg"
+            alt="Logo Provisión"
+            width={120}
+            height={120}
+            style={{ objectFit: 'contain' }}
+          />
         </div>
+
         <button
-          onClick={handleLogout}
+          type="button"
+          onClick={() => setVista('inicio')}
           style={{
-            background: '#ef4444',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            color: 'white',
-            borderRadius: '6px',
-            cursor: 'pointer',
+            ...menuItem,
+            background:
+              vista === 'inicio' ? 'rgba(255,255,255,0.14)' : 'transparent',
+            border:
+              vista === 'inicio'
+                ? '1px solid rgba(255,255,255,0.25)'
+                : '1px solid transparent',
+            transform: vista === 'inicio' ? 'translateY(-1px)' : undefined,
           }}
         >
-          Cerrar sesión
+          🏠 Inicio
         </button>
-      </header>
 
-      <main style={{ maxWidth: '900px', margin: '2rem auto', padding: '0 1rem' }}>
-        {cargando ? (
-          <p>{mensaje}</p>
-        ) : mensaje ? (
-          <p>{mensaje}</p>
-        ) : (
-          <table
+        <button
+          type="button"
+          onClick={() => setVista('desprendibles')}
+          style={{
+            ...menuItem,
+            background:
+              vista === 'desprendibles'
+                ? 'rgba(255,255,255,0.14)'
+                : 'transparent',
+            border:
+              vista === 'desprendibles'
+                ? '1px solid rgba(255,255,255,0.25)'
+                : '1px solid transparent',
+            transform:
+              vista === 'desprendibles' ? 'translateY(-1px)' : undefined,
+          }}
+        >
+          📄 Desprendibles
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setVista('certificados')}
+          style={{
+            ...menuItem,
+            background:
+              vista === 'certificados'
+                ? 'rgba(255,255,255,0.14)'
+                : 'transparent',
+            border:
+              vista === 'certificados'
+                ? '1px solid rgba(255,255,255,0.25)'
+                : '1px solid transparent',
+            transform:
+              vista === 'certificados' ? 'translateY(-1px)' : undefined,
+          }}
+        >
+          📑 Certificados
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setVista('servicios')}
+          style={{
+            ...menuItem,
+            background:
+              vista === 'servicios'
+                ? 'rgba(255,255,255,0.14)'
+                : 'transparent',
+            border:
+              vista === 'servicios'
+                ? '1px solid rgba(255,255,255,0.25)'
+                : '1px solid transparent',
+            transform: vista === 'servicios' ? 'translateY(-1px)' : undefined,
+          }}
+        >
+          ⚙️ Más Servicios
+        </button>
+
+        <button
+          type="button"
+          onClick={cerrarSesion}
+          style={{
+            marginTop: 'auto',
+            background: '#DC2626',
+            border: 'none',
+            color: 'white',
+            padding: '12px 14px',
+            borderRadius: 12,
+            cursor: 'pointer',
+            fontWeight: 'bold',
+          }}
+        >
+          🚪 Cerrar sesión
+        </button>
+      </aside>
+
+      {/* Contenido principal */}
+      <main
+        style={{
+          flex: 1,
+          padding: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          color: '#0F172A',
+          overflowX: 'hidden',
+          minWidth: 0,
+        }}
+      >
+        {vista === 'inicio' && (
+          <div
             style={{
               width: '100%',
-              borderCollapse: 'collapse',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              borderRadius: '8px',
-              overflow: 'hidden',
+              maxWidth: 1080,
             }}
           >
-            <thead style={{ backgroundColor: '#0C3B75', color: 'white' }}>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Periodo</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Tipo de Pago</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Fecha de Subida</th>
-                <th style={{ textAlign: 'left', padding: '10px' }}>Descargar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {desprendibles.map((d, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '10px' }}>{d.periodo}</td>
-                  <td style={{ padding: '10px' }}>{d.tipo_pago}</td>
-                  <td style={{ padding: '10px' }}>
-                    {new Date(d.fecha_subida).toLocaleDateString('es-CO')}
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <a
-                      href={d.url_pdf}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#22c55e',
-                        fontWeight: 'bold',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      📄 Descargar
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* Bienvenida SOLO en Inicio */}
+            <div
+              style={{
+                width: '100%',
+                marginBottom: 24,
+                textAlign: 'center',
+              }}
+            >
+              <h1
+                style={{
+                  color: '#0C3B75',
+                  marginBottom: 10,
+                  fontSize: 32,
+                  lineHeight: 1.2,
+                }}
+              >
+                Bienvenido al Portal del Empleado
+              </h1>
+
+              <p
+                style={{
+                  color: '#64748B',
+                  fontSize: 16,
+                  maxWidth: 700,
+                  margin: '0 auto',
+                }}
+              >
+                Desde aquí podrás consultar tus desprendibles, certificados y futuros
+                servicios que Provisión L&amp;M pondrá a tu disposición.
+              </p>
+            </div>
+          </div>
         )}
+
+        {/* Vistas */}
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 1080,
+            display: 'flex',
+            justifyContent: 'center',
+            overflowX: 'hidden',
+          }}
+        >
+          {/* VISTA INICIO */}
+          {vista === 'inicio' && (
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              {/* Imagen principal (casi todo el cuadro) */}
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.10)',
+                  width: '100%',
+                  maxWidth: 1080,
+                  height: 520,
+                  marginBottom: 28,
+                }}
+              >
+                <img
+                  src="/inicio.png"
+                  alt="Portal del Empleado"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* VISTA DESPRENDIBLES */}
+          {vista === 'desprendibles' && (
+            <div style={{ width: '100%', maxWidth: 1200 }}>
+              <DesprendiblesEmbedded />
+            </div>
+          )}
+
+          {/* VISTA CERTIFICADOS */}
+          {vista === 'certificados' && (
+            <div style={{ width: '100%', maxWidth: 1200 }}>
+              <CertificadosEmbedded />
+            </div>
+          )}
+
+          {/* VISTA SERVICIOS */}
+          {vista === 'servicios' && (
+            <div style={{ width: '100%', maxWidth: 1200 }}>
+              <ServiciosEmbedded />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )
+}
+
+function DesprendiblesEmbedded() {
+  const router = useRouter()
+
+  const [empleado, setEmpleado] = useState<any>(null)
+  const [desprendibles, setDesprendibles] = useState<Desprendible[]>([])
+  const [mensaje, setMensaje] = useState('Cargando documentos...')
+  const [cargando, setCargando] = useState(true)
+
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+
+  useEffect(() => {
+    cargarDatos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const cargarDatos = async (desde?: string, hasta?: string) => {
+    setCargando(true)
+
+    const { data: userData } = await supabase.auth.getUser()
+
+    if (!userData.user) {
+      router.push('/login')
+      return
+    }
+
+    const correo = userData.user.email
+
+    const { data: emp } = await supabase
+      .from('empleados')
+      .select('id,nombre,documento,id_provision')
+      .eq('correo', correo)
+      .maybeSingle()
+
+    if (!emp) {
+      setMensaje('No se encontró el empleado.')
+      setCargando(false)
+      return
+    }
+
+    setEmpleado(emp)
+
+    let query = supabase
+      .from('desprendibles')
+      .select('periodo,tipo_pago,fecha_subida,url_pdf')
+      .eq('documento', emp.documento)
+      .order('fecha_subida', { ascending: false })
+
+    if (desde && hasta) {
+      query = query
+        .gte('fecha_subida', `${desde}T00:00:00`)
+        .lte('fecha_subida', `${hasta}T23:59:59`)
+    }
+
+    const { data } = await query
+
+    setDesprendibles((data as Desprendible[]) || [])
+    setMensaje('')
+    setCargando(false)
+  }
+
+  const mostrarTodos = () => {
+    setFechaDesde('')
+    setFechaHasta('')
+    cargarDatos()
+  }
+
+  const inputWrapperStyle = useMemo(
+    () => ({
+      padding: '10px',
+      border: '1px solid #CBD5E1',
+      borderRadius: '10px',
+      background: 'white',
+    }),
+    []
+  )
+
+  const buscarBtnStyle = useMemo(
+    () => ({
+      background: '#0C3B75',
+      color: 'white',
+      border: 'none',
+      padding: '10px 18px',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: 600,
+    }),
+    []
+  )
+
+  const todosBtnStyle = useMemo(
+    () => ({
+      background: '#64748B',
+      color: 'white',
+      border: 'none',
+      padding: '10px 18px',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: 600,
+    }),
+    []
+  )
+
+  const th = useMemo(
+    () => ({
+      padding: '14px',
+      textAlign: 'left' as const,
+      fontWeight: 700,
+      color: 'white',
+      whiteSpace: 'nowrap' as const,
+    }),
+    []
+  )
+
+  const td = useMemo(
+    () => ({
+      padding: '14px',
+      borderBottom: '1px solid #E2E8F0',
+      whiteSpace: 'nowrap' as const,
+      maxWidth: 220,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }),
+    []
+  )
+
+  return (
+    <div style={{ width: '100%', padding: 0 }}>
+      <div style={{ overflowX: 'auto', borderRadius: 16 }}>
+        <div
+          style={{
+            marginBottom: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          <h2 style={{ color: '#0C3B75', margin: 0 }}>📄 Mis Desprendibles</h2>
+          <p style={{ color: '#64748B', margin: 0 }}>
+            Consulta y descarga tus desprendibles de nómina.
+          </p>
+        </div>
+
+        {empleado && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: '14px 16px',
+              background: 'white',
+              borderRadius: 12,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            }}
+          >
+            <strong>{empleado.nombre}</strong>
+            <div style={{ color: '#64748B', marginTop: 4 }}>
+              ID: {empleado.id_provision || 'N/A'}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 16,
+            alignItems: 'center',
+          }}
+        >
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            style={inputWrapperStyle}
+          />
+
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            style={inputWrapperStyle}
+          />
+
+          <button
+            onClick={() => cargarDatos(fechaDesde, fechaHasta)}
+            style={buscarBtnStyle}
+          >
+            Buscar
+          </button>
+
+          <button onClick={mostrarTodos} style={todosBtnStyle}>
+            Mostrar todos
+          </button>
+        </div>
+
+        <div
+          style={{
+            background: 'white',
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+          }}
+        >
+          {cargando ? (
+            <div style={{ padding: '24px', color: '#64748B' }}>{mensaje}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#0C3B75' }}>
+                <tr>
+                  <th style={th}>Periodo</th>
+                  <th style={th}>Tipo Pago</th>
+                  <th style={th}>Fecha</th>
+                  <th style={th}>Documento</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {desprendibles.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: 28 }}>
+                      No se encontraron documentos.
+                    </td>
+                  </tr>
+                ) : (
+                  desprendibles.map((d, i) => (
+                    <tr key={i}>
+                      <td style={td}>{d.periodo}</td>
+                      <td style={td}>{d.tipo_pago}</td>
+                      <td style={td}>
+                        {new Date(d.fecha_subida).toLocaleDateString('es-CO')}
+                      </td>
+                      <td style={td}>
+                        <a
+                          href={d.url_pdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#16A34A',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          ⬇ Descargar PDF
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CertificadosEmbedded() {
+  const router = useRouter()
+
+  const [empleado, setEmpleado] = useState<any>(null)
+  const [certificados, setCertificados] = useState<Certificado[]>([])
+  const [mensaje, setMensaje] = useState('Cargando documentos...')
+  const [cargando, setCargando] = useState(true)
+
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+
+  useEffect(() => {
+    cargarDatos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const cargarDatos = async (desde?: string, hasta?: string) => {
+    setCargando(true)
+
+    const { data: userData } = await supabase.auth.getUser()
+
+    console.log('Usuario Auth:', userData)
+    const correo = userData?.user?.email
+    console.log('Correo:', correo)
+
+    if (!userData?.user) {
+      router.push('/login')
+      return
+    }
+
+    const { data: emp, error: empError } = await supabase
+      .from('empleados')
+      .select('id,nombre,documento,id_provision')
+      .eq('correo', correo)
+      .maybeSingle()
+
+    if (empError) {
+      console.log('Error consultando empleado:', empError)
+      setMensaje(`Error consultando empleado: ${empError.message}`)
+      setCertificados([])
+      setCargando(false)
+      return
+    }
+
+    console.log('Empleado:', emp)
+
+    if (!emp) {
+      setMensaje('No se encontró el empleado.')
+      setCertificados([])
+      setCargando(false)
+      return
+    }
+
+    setEmpleado(emp)
+
+    const empDocumento = String(emp.documento).trim()
+    console.log('Documento empleado:', empDocumento, 'JSON:', JSON.stringify(empDocumento))
+
+    // ---- PRUEBA DEFINITIVA (30s) ----
+    // Temporariamente eliminamos el filtro por documento para aislar si el problema
+    // es RLS/permisos vs. filtro .eq('documento', empDocumento)
+    //
+    // let query = supabase
+    //   .from('certificados')
+    //   .select(
+    //     'id,empleado_id,id_provision,documento,nombre_empleado,tipo_certificado,url_pdf,fecha_subida'
+    //   )
+    //   .eq('documento', empDocumento)
+    //   .order('fecha_subida', { ascending: false })
+    //
+    // if (desde && hasta) {
+    //   query = query
+    //     .gte('fecha_subida', `${desde}T00:00:00`)
+    //     .lte('fecha_subida', `${hasta}T23:59:59`)
+    // }
+    //
+    // const { data, error: certError } = await query
+
+    const { data, error: certError } = await supabase
+      .from('certificados')
+      .select('*')
+
+    console.log('TODOS LOS CERTIFICADOS:', data)
+    console.log('Error certificados (select *):', certError)
+
+    if (certError) {
+      setMensaje(`Error consultando certificados: ${certError.message}`)
+      setCertificados([])
+      setCargando(false)
+      return
+    }
+
+    const filas = (data as Certificado[]) || []
+    setCertificados(filas)
+
+    setMensaje('') // durante la prueba no mostramos mensaje específico del filtro
+    setCargando(false)
+  }
+
+  const mostrarTodos = () => {
+    setFechaDesde('')
+    setFechaHasta('')
+    cargarDatos()
+  }
+
+  const inputWrapperStyle = useMemo(
+    () => ({
+      padding: '10px',
+      border: '1px solid #CBD5E1',
+      borderRadius: '10px',
+      background: 'white',
+    }),
+    []
+  )
+
+  const buscarBtnStyle = useMemo(
+    () => ({
+      background: '#0C3B75',
+      color: 'white',
+      border: 'none',
+      padding: '10px 18px',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: 600,
+    }),
+    []
+  )
+
+  const todosBtnStyle = useMemo(
+    () => ({
+      background: '#64748B',
+      color: 'white',
+      border: 'none',
+      padding: '10px 18px',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: 600,
+    }),
+    []
+  )
+
+  const th = useMemo(
+    () => ({
+      padding: '14px',
+      textAlign: 'left' as const,
+      fontWeight: 700,
+      color: 'white',
+      whiteSpace: 'nowrap' as const,
+    }),
+    []
+  )
+
+  const td = useMemo(
+    () => ({
+      padding: '14px',
+      borderBottom: '1px solid #E2E8F0',
+      whiteSpace: 'nowrap' as const,
+      maxWidth: 220,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }),
+    []
+  )
+
+  return (
+    <div style={{ width: '100%', padding: 0 }}>
+      <div style={{ overflowX: 'auto', borderRadius: 16 }}>
+        <div
+          style={{
+            marginBottom: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          <h2 style={{ color: '#0C3B75', margin: 0 }}>📑 Mis Certificados</h2>
+          <p style={{ color: '#64748B', margin: 0 }}>
+            Consulta tus certificados laborales disponibles.
+          </p>
+        </div>
+
+        {empleado && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: '14px 16px',
+              background: 'white',
+              borderRadius: 12,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            }}
+          >
+            <strong>{empleado.nombre}</strong>
+            <div style={{ color: '#64748B', marginTop: 4 }}>
+              ID: {empleado.id_provision || 'N/A'}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 16,
+            alignItems: 'center',
+          }}
+        >
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            style={inputWrapperStyle}
+          />
+
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            style={inputWrapperStyle}
+          />
+
+          <button
+            onClick={() => cargarDatos(fechaDesde, fechaHasta)}
+            style={buscarBtnStyle}
+          >
+            Buscar
+          </button>
+
+          <button onClick={mostrarTodos} style={todosBtnStyle}>
+            Mostrar todos
+          </button>
+        </div>
+
+        <div
+          style={{
+            background: 'white',
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+          }}
+        >
+          {cargando ? (
+            <div style={{ padding: '24px', color: '#64748B' }}>{mensaje}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#0C3B75' }}>
+                <tr>
+                  <th style={th}>Documento</th>
+                  <th style={th}>Tipo</th>
+                  <th style={th}>Fecha</th>
+                  <th style={th}>Certificado</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {certificados.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: 28 }}>
+                      No se encontraron documentos.
+                    </td>
+                  </tr>
+                ) : (
+                  certificados.map((c) => (
+                    <tr key={c.id}>
+                      <td style={td}>{c.documento}</td>
+                      <td style={td}>{c.tipo_certificado}</td>
+                      <td style={td}>
+                        {new Date(c.fecha_subida).toLocaleDateString('es-CO')}
+                      </td>
+                      <td style={td}>
+                        <a
+                          href={c.url_pdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#16A34A',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          ⬇ Descargar PDF
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ServiciosEmbedded() {
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ color: '#0C3B75', margin: 0 }}>⚙️ Más Servicios</h2>
+      <p style={{ color: '#64748B', marginTop: 8 }}>
+        Próximamente tendremos más servicios disponibles para nuestros
+        empleados.
+      </p>
+    </div>
+  )
+}
+
+const menuItem: React.CSSProperties = {
+  color: 'white',
+  padding: '12px 12px',
+  borderRadius: 12,
+  marginBottom: 10,
+  fontSize: 15,
+  border: '1px solid transparent',
+  cursor: 'pointer',
+  background: 'transparent',
+  textAlign: 'left',
+  fontWeight: 700,
+}
+
+const cardStyle: React.CSSProperties = {
+  background: 'white',
+  padding: '20px',
+  borderRadius: 16,
+  boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+  textDecoration: 'none',
+  color: '#0F172A',
+  textAlign: 'center',
+  border: 'none',
+  cursor: 'pointer',
+  transition: 'transform 0.08s ease, box-shadow 0.08s ease',
 }

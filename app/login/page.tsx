@@ -83,7 +83,8 @@ export default function PortalDesprendibles() {
         },
       })
 
-      await cargarDesprendibles(usuario)
+      // Redirigir al portal nuevo (empleado). Evita mostrar la UI vieja dentro de /login.
+      router.replace('/empleado')
     }
 
     verificarSesion()
@@ -120,15 +121,18 @@ export default function PortalDesprendibles() {
     }
 
     setMensaje('✅ Iniciando sesión...')
-    setTimeout(async () => {
-      const { data } = await supabase.auth.getUser()
-      if (data.user) {
-        setUser(data.user)
-        await cargarDesprendibles(data.user)
-        setMostrarAviso(true)
-      }
+
+    const { data } = await supabase.auth.getUser()
+    if (data.user) {
+      setUser(data.user)
+      setMostrarAviso(true)
       setCargando(false)
-    }, 1000)
+      // Redirigir al portal nuevo (empleado)
+      router.replace('/empleado')
+      return
+    }
+
+    setCargando(false)
   }
 
   const cargarDesprendibles = async (usuario: any, desde?: string, hasta?: string) => {
@@ -360,6 +364,10 @@ export default function PortalDesprendibles() {
   // ---------------------------------------------------------------
   // PORTAL DEL EMPLEADO
   // ---------------------------------------------------------------
+  // Si el usuario está autenticado, siempre lo redirigimos a /empleado.
+  // Para evitar render de una UI vieja dentro de /login, devolvemos null aquí.
+  if (user) return null
+
   return (
     <div
       style={{

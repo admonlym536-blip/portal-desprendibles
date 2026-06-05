@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 
 export default function AdminUploadMultiple() {
@@ -8,7 +9,9 @@ export default function AdminUploadMultiple() {
 
   const handleUpload = async () => {
     if (!files || files.length === 0) {
-      setMensaje('⚠️ Por favor selecciona uno o más archivos PDF.')
+      setMensaje(
+        '⚠️ Por favor selecciona uno o más archivos PDF.'
+      )
       return
     }
 
@@ -31,7 +34,10 @@ export default function AdminUploadMultiple() {
 
         const result = await res.json()
 
-        if (result.detalles && result.detalles.length > 0) {
+        if (
+          result.detalles &&
+          result.detalles.length > 0
+        ) {
           const detalle = result.detalles[0]
 
           if (detalle.estado === 'MONTADO') {
@@ -45,74 +51,121 @@ export default function AdminUploadMultiple() {
           noMontados++
           resumen += `❌ ${files[i].name} → Error inesperado\n`
         }
-
       } catch (error) {
         noMontados++
         resumen += `❌ ${files[i].name} → Error de conexión\n`
       }
 
-      // Mostrar progreso en tiempo real
-      setMensaje(`📤 Procesando ${i + 1} de ${files.length}\n\n` + resumen)
+      setMensaje(
+        `📤 Procesando ${i + 1} de ${files.length}\n\n${resumen}`
+      )
     }
 
     setMensaje(
       `✅ CARGA FINALIZADA\n\n` +
-      `Total archivos: ${files.length}\n` +
-      `Montados: ${montados}\n` +
-      `No montados: ${noMontados}\n\n` +
-      resumen
+        `Total archivos: ${files.length}\n` +
+        `Montados: ${montados}\n` +
+        `No montados: ${noMontados}\n\n` +
+        resumen
     )
 
     setSubiendo(false)
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: 650, margin: 'auto' }}>
-      <h1 style={{ color: '#0C3B75', textAlign: 'center' }}>
-        Carga masiva de Desprendibles
+    <div
+      style={{
+        maxWidth: '800px',
+        margin: '40px auto',
+        background: '#ffffff',
+        padding: '30px',
+        borderRadius: '12px',
+        boxShadow:
+          '0 2px 12px rgba(0,0,0,0.08)',
+        fontFamily: 'Arial, sans-serif',
+      }}
+    >
+      <h1
+        style={{
+          marginBottom: '10px',
+        }}
+      >
+        📄 Carga Masiva de Desprendibles
       </h1>
 
-      <p style={{ fontSize: '0.9rem', color: '#555' }}>
-        📂 Selecciona varios archivos PDF con el formato:
-        <br />
-        <strong>Documento_Periodo.pdf</strong> — ejemplo: <em>10000001_Enero2025.pdf</em>
+      <p
+        style={{
+          color: '#555',
+          marginBottom: '20px',
+        }}
+      >
+        Cargue uno o varios desprendibles PDF.
       </p>
+
+      <div
+        style={{
+          background: '#f5f5f5',
+          padding: '15px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+        }}
+      >
+        <strong>Formato requerido:</strong>
+
+        <br />
+        <br />
+
+        <code>
+          10000001_Enero2025.pdf
+        </code>
+      </div>
 
       <input
         type="file"
-        accept="application/pdf"
         multiple
-        onChange={(e) => setFiles(e.target.files)}
-        style={{ marginBottom: '1rem', width: '100%' }}
+        accept=".pdf"
+        onChange={(e) =>
+          setFiles(e.target.files)
+        }
+        style={{
+          marginBottom: '20px',
+        }}
       />
 
-      <button
-        onClick={handleUpload}
-        disabled={subiendo}
-        style={{
-          backgroundColor: subiendo ? '#ccc' : '#4BB543',
-          color: 'white',
-          padding: '0.8rem 1.5rem',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: subiendo ? 'not-allowed' : 'pointer',
-          width: '100%',
-          fontSize: '1rem',
-        }}
-      >
-        {subiendo ? 'Subiendo...' : 'Subir Todos los Desprendibles'}
-      </button>
+      <div>
+        <button
+          onClick={handleUpload}
+          disabled={subiendo}
+          style={{
+            background: subiendo
+              ? '#999'
+              : '#2563eb',
+            color: '#fff',
+            border: 'none',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            cursor: subiendo
+              ? 'not-allowed'
+              : 'pointer',
+            fontWeight: 'bold',
+          }}
+        >
+          {subiendo
+            ? '⏳ Subiendo desprendibles...'
+            : '📤 Subir Desprendibles'}
+        </button>
+      </div>
 
       {mensaje && (
         <pre
           style={{
-            marginTop: '1.5rem',
-            background: '#f4f4f4',
-            padding: '1rem',
+            marginTop: '25px',
+            background: '#f8f8f8',
+            padding: '15px',
             borderRadius: '8px',
             whiteSpace: 'pre-wrap',
-            fontSize: '0.9rem',
-            color: '#333',
+            overflowX: 'auto',
+            border: '1px solid #ddd',
           }}
         >
           {mensaje}
