@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 
 export default function RecuperarClave() {
@@ -12,6 +13,29 @@ export default function RecuperarClave() {
   const [confirmar, setConfirmar] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
+
+  useEffect(() => {
+    const verificarEstado = async () => {
+      const { data } = await supabase.auth.getUser()
+
+      if (!data.user) return
+
+      const { data: empleado } = await supabase
+        .from('empleados')
+        .select('debe_cambiar_password')
+        .eq('correo', data.user.email)
+        .single()
+
+      if (
+        empleado &&
+        empleado.debe_cambiar_password === false
+      ) {
+        router.replace('/empleado')
+      }
+    }
+
+    verificarEstado()
+  }, [router])
 
   const handleChangePassword = async () => {
     setMensaje('')
@@ -30,7 +54,9 @@ export default function RecuperarClave() {
     }
 
     if (nueva.length < 6) {
-      setMensaje('⚠️ La nueva contraseña debe tener al menos 6 caracteres.')
+      setMensaje(
+        '⚠️ La nueva contraseña debe tener al menos 6 caracteres.'
+      )
       setCargando(false)
       return
     }
@@ -41,23 +67,40 @@ export default function RecuperarClave() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, nueva }),
+        body: JSON.stringify({
+          email,
+          nueva,
+        }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setMensaje(`❌ ${data.error || 'Error al actualizar la contraseña.'}`)
+        setMensaje(
+          `❌ ${
+            data.error ||
+            'Error al actualizar la contraseña.'
+          }`
+        )
         setCargando(false)
         return
       }
 
-      setMensaje('✅ Contraseña actualizada correctamente. Redirigiendo...')
-      setTimeout(() => router.replace('/login'), 2000)
+      setMensaje('✅ Contraseña actualizada correctamente. Cerrando sesión...')
 
+      // Importante: después de cambiar contraseña, forzamos logout para que el usuario NO quede logueado
+      // (evita el comportamiento de "sigue logueado" que reportaste).
+      await supabase.auth.signOut()
+
+      setTimeout(() => {
+        router.replace('/login')
+      }, 500)
     } catch (err) {
       console.error(err)
-      setMensaje('❌ Error inesperado al actualizar la contraseña.')
+
+      setMensaje(
+        '❌ Error inesperado al actualizar la contraseña.'
+      )
     } finally {
       setCargando(false)
     }
@@ -70,7 +113,8 @@ export default function RecuperarClave() {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        background: 'linear-gradient(135deg, #0C3B75 40%, #0A2E5A 100%)',
+        background:
+          'linear-gradient(135deg, #0C3B75 40%, #0A2E5A 100%)',
         fontFamily: 'Segoe UI, Roboto, sans-serif',
       }}
     >
@@ -78,7 +122,8 @@ export default function RecuperarClave() {
         style={{
           background: 'white',
           borderRadius: '20px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          boxShadow:
+            '0 10px 25px rgba(0,0,0,0.2)',
           width: '100%',
           maxWidth: '420px',
           padding: '2.5rem',
@@ -94,14 +139,20 @@ export default function RecuperarClave() {
           />
         </div>
 
-        <h2 style={{ color: '#0C3B75' }}>Recuperar Contraseña</h2>
+        <h2 style={{ color: '#0C3B75' }}>
+          Recuperar Contraseña
+        </h2>
 
         <input
           type="email"
           placeholder="Correo"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ width: '100%', marginBottom: '10px' }}
+          style={{
+            width: '100%',
+            marginBottom: '10px',
+            padding: '10px',
+          }}
         />
 
         <input
@@ -109,7 +160,11 @@ export default function RecuperarClave() {
           placeholder="Nueva contraseña"
           value={nueva}
           onChange={(e) => setNueva(e.target.value)}
-          style={{ width: '100%', marginBottom: '10px' }}
+          style={{
+            width: '100%',
+            marginBottom: '10px',
+            padding: '10px',
+          }}
         />
 
         <input
@@ -117,7 +172,11 @@ export default function RecuperarClave() {
           placeholder="Confirmar contraseña"
           value={confirmar}
           onChange={(e) => setConfirmar(e.target.value)}
-          style={{ width: '100%', marginBottom: '15px' }}
+          style={{
+            width: '100%',
+            marginBottom: '15px',
+            padding: '10px',
+          }}
         />
 
         <button
@@ -134,10 +193,36 @@ export default function RecuperarClave() {
             cursor: 'pointer',
           }}
         >
-          {cargando ? 'Actualizando...' : 'Cambiar contraseña'}
+          {cargando
+            ? 'Actualizando...'
+            : 'Cambiar contraseña'}
         </button>
 
-        {mensaje && <p style={{ marginTop: '10px' }}>{mensaje}</p>}
+        <button
+          type="button"
+          onClick={async () => {
+            await supabase.auth.signOut()
+            router.replace('/login')
+          }}
+          style={{
+            width: '100%',
+            padding: '10px',
+            marginTop: '10px',
+            background: '#64748B',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+          }}
+        >
+          Cancelar
+        </button>
+
+        {mensaje && (
+          <p style={{ marginTop: '10px' }}>
+            {mensaje}
+          </p>
+        )}
       </div>
     </div>
   )

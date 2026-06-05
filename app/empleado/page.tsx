@@ -28,6 +28,70 @@ type Certificado = {
 export default function DashboardEmpleado() {
   const router = useRouter()
   const [vista, setVista] = useState<Vista>('inicio')
+  const [authLoaded, setAuthLoaded] = useState(false)
+
+  const [autoLogoutMsg, setAutoLogoutMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cargarAuth = async () => {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData?.user) {
+        router.replace('/login')
+        return
+      }
+      setAuthLoaded(true)
+    }
+
+    cargarAuth()
+  }, [router])
+
+  // Auto-cierre: 60s desde la carga y/o 60s de inactividad (cualquier interacción reinicia)
+  useEffect(() => {
+    if (!authLoaded) return
+
+    const LOGOUT_MS = 60 * 1000
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let lastActivity = Date.now()
+    let didLogout = false
+
+    const touch = () => {
+      lastActivity = Date.now()
+      if (didLogout) return
+      if (timeoutId) clearTimeout(timeoutId)
+
+      timeoutId = setTimeout(() => {
+        if (didLogout) return
+        // (Defensivo) asegura que realmente han pasado los ms
+        if (Date.now() - lastActivity < LOGOUT_MS) return
+
+        didLogout = true
+        setAutoLogoutMsg('Sesión expirada por inactividad. Cerrando sesión...')
+
+        supabase.auth.signOut().finally(() => {
+          router.replace('/login')
+        })
+      }, LOGOUT_MS)
+    }
+
+    // Desde que entra también cuenta como “tiempo abierto”
+    touch()
+
+    const onUserActivity = () => touch()
+    window.addEventListener('click', onUserActivity)
+    window.addEventListener('keydown', onUserActivity)
+    window.addEventListener('mousemove', onUserActivity)
+    window.addEventListener('scroll', onUserActivity)
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      window.removeEventListener('click', onUserActivity)
+      window.removeEventListener('keydown', onUserActivity)
+      window.removeEventListener('mousemove', onUserActivity)
+      window.removeEventListener('scroll', onUserActivity)
+    }
+  }, [authLoaded, router])
+
+  if (!authLoaded) return null
 
   const cerrarSesion = async () => {
     await supabase.auth.signOut()
@@ -175,21 +239,29 @@ export default function DashboardEmpleado() {
           minWidth: 0,
         }}
       >
-        {vista === 'inicio' && (
+        {autoLogoutMsg && (
           <div
             style={{
               width: '100%',
               maxWidth: 1080,
+              marginBottom: 16,
+              padding: 12,
+              borderRadius: 12,
+              background: '#FEE2E2',
+              border: '1px solid #FCA5A5',
+              color: '#991B1B',
+              textAlign: 'center',
+              fontWeight: 700,
             }}
           >
-            {/* Bienvenida SOLO en Inicio */}
-            <div
-              style={{
-                width: '100%',
-                marginBottom: 24,
-                textAlign: 'center',
-              }}
-            >
+            {autoLogoutMsg}
+          </div>
+        )}
+
+        {/* Bienvenida SOLO en Inicio */}
+        {vista === 'inicio' && (
+          <div style={{ width: '100%', maxWidth: 1080, marginBottom: 16 }}>
+            <div style={{ width: '100%', textAlign: 'center', marginBottom: 24 }}>
               <h1
                 style={{
                   color: '#0C3B75',
@@ -213,77 +285,48 @@ export default function DashboardEmpleado() {
                 servicios que Provisión L&amp;M pondrá a tu disposición.
               </p>
             </div>
+
+            {/* Imagen principal (casi todo el cuadro) */}
+            <div
+              style={{
+                background: 'white',
+                borderRadius: 20,
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.10)',
+                width: '100%',
+                height: 520,
+              }}
+            >
+              <img
+                src="/inicio.png"
+                alt="Portal del Empleado"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+            </div>
           </div>
         )}
 
-        {/* Vistas */}
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 1080,
-            display: 'flex',
-            justifyContent: 'center',
-            overflowX: 'hidden',
-          }}
-        >
-          {/* VISTA INICIO */}
-          {vista === 'inicio' && (
-            <div
-              style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-              }}
-            >
-              {/* Imagen principal (casi todo el cuadro) */}
-              <div
-                style={{
-                  background: 'white',
-                  borderRadius: 20,
-                  overflow: 'hidden',
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.10)',
-                  width: '100%',
-                  maxWidth: 1080,
-                  height: 520,
-                  marginBottom: 28,
-                }}
-              >
-                <img
-                  src="/inicio.png"
-                  alt="Portal del Empleado"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* VISTA DESPRENDIBLES */}
-          {vista === 'desprendibles' && (
-            <div style={{ width: '100%', maxWidth: 1200 }}>
-              <DesprendiblesEmbedded />
-            </div>
-          )}
-
-          {/* VISTA CERTIFICADOS */}
-          {vista === 'certificados' && (
-            <div style={{ width: '100%', maxWidth: 1200 }}>
-              <CertificadosEmbedded />
-            </div>
-          )}
-
-          {/* VISTA SERVICIOS */}
-          {vista === 'servicios' && (
-            <div style={{ width: '100%', maxWidth: 1200 }}>
-              <ServiciosEmbedded />
-            </div>
-          )}
-        </div>
+        {/* Vistas distintas de Inicio */}
+        {vista !== 'inicio' && (
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 1080,
+              display: 'flex',
+              justifyContent: 'center',
+              overflowX: 'hidden',
+            }}
+          >
+            {vista === 'desprendibles' && <DesprendiblesEmbedded />}
+            {vista === 'certificados' && <CertificadosEmbedded />}
+            {vista === 'servicios' && <ServiciosEmbedded />}
+          </div>
+        )}
       </main>
     </div>
   )
@@ -518,7 +561,12 @@ function DesprendiblesEmbedded() {
                       <td style={td}>{d.periodo}</td>
                       <td style={td}>{d.tipo_pago}</td>
                       <td style={td}>
-                        {new Date(d.fecha_subida).toLocaleDateString('es-CO')}
+                        {new Date(d.fecha_subida).toLocaleDateString('es-CO', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                          timeZone: 'UTC',
+                        })}
                       </td>
                       <td style={td}>
                         <a
@@ -602,34 +650,23 @@ function CertificadosEmbedded() {
     setEmpleado(emp)
 
     const empDocumento = String(emp.documento).trim()
-    console.log('Documento empleado:', empDocumento, 'JSON:', JSON.stringify(empDocumento))
-
-    // ---- PRUEBA DEFINITIVA (30s) ----
-    // Temporariamente eliminamos el filtro por documento para aislar si el problema
-    // es RLS/permisos vs. filtro .eq('documento', empDocumento)
-    //
-    // let query = supabase
-    //   .from('certificados')
-    //   .select(
-    //     'id,empleado_id,id_provision,documento,nombre_empleado,tipo_certificado,url_pdf,fecha_subida'
-    //   )
-    //   .eq('documento', empDocumento)
-    //   .order('fecha_subida', { ascending: false })
-    //
-    // if (desde && hasta) {
-    //   query = query
-    //     .gte('fecha_subida', `${desde}T00:00:00`)
-    //     .lte('fecha_subida', `${hasta}T23:59:59`)
-    // }
-    //
-    // const { data, error: certError } = await query
+    console.log(
+      'Documento empleado:',
+      empDocumento,
+      'JSON:',
+      JSON.stringify(empDocumento)
+    )
 
     const { data, error: certError } = await supabase
       .from('certificados')
-      .select('*')
+      .select(
+        'id,empleado_id,id_provision,documento,nombre_empleado,tipo_certificado,url_pdf,fecha_subida'
+      )
+      .eq('documento', empDocumento)
+      .order('fecha_subida', { ascending: false })
 
-    console.log('TODOS LOS CERTIFICADOS:', data)
-    console.log('Error certificados (select *):', certError)
+    console.log('Certificados encontrados (filtrados):', data)
+    console.log('Error certificados (filtrados):', certError)
 
     if (certError) {
       setMensaje(`Error consultando certificados: ${certError.message}`)
@@ -641,7 +678,8 @@ function CertificadosEmbedded() {
     const filas = (data as Certificado[]) || []
     setCertificados(filas)
 
-    setMensaje('') // durante la prueba no mostramos mensaje específico del filtro
+    // Mensaje se deja en blanco si hay datos
+    setMensaje('')
     setCargando(false)
   }
 
@@ -846,8 +884,7 @@ function ServiciosEmbedded() {
     <div style={{ width: '100%' }}>
       <h2 style={{ color: '#0C3B75', margin: 0 }}>⚙️ Más Servicios</h2>
       <p style={{ color: '#64748B', marginTop: 8 }}>
-        Próximamente tendremos más servicios disponibles para nuestros
-        empleados.
+        Próximamente tendremos más servicios disponibles para nuestros empleados.
       </p>
     </div>
   )
@@ -864,17 +901,4 @@ const menuItem: React.CSSProperties = {
   background: 'transparent',
   textAlign: 'left',
   fontWeight: 700,
-}
-
-const cardStyle: React.CSSProperties = {
-  background: 'white',
-  padding: '20px',
-  borderRadius: 16,
-  boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-  textDecoration: 'none',
-  color: '#0F172A',
-  textAlign: 'center',
-  border: 'none',
-  cursor: 'pointer',
-  transition: 'transform 0.08s ease, box-shadow 0.08s ease',
 }
